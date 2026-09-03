@@ -1,5 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { VaultManager } from './vault/manager'
+import { registerVaultIpc } from './vault/ipc'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -27,6 +29,10 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  app.setName('NYX Browser')
+  const vault = new VaultManager(join(app.getPath('userData'), 'vault.nyx'))
+  registerVaultIpc(vault)
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
