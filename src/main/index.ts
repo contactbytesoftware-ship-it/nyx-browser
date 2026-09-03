@@ -2,8 +2,10 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { VaultManager } from './vault/manager'
 import { registerVaultIpc } from './vault/ipc'
+import { TabManager } from './tabs/manager'
+import { registerTabsIpc } from './tabs/ipc'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -26,6 +28,8 @@ function createWindow(): void {
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return win
 }
 
 app.whenReady().then(() => {
@@ -33,7 +37,10 @@ app.whenReady().then(() => {
   const vault = new VaultManager(join(app.getPath('userData'), 'vault.nyx'))
   registerVaultIpc(vault)
 
-  createWindow()
+  const win = createWindow()
+  const tabs = new TabManager(win)
+  registerTabsIpc(win, tabs)
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
