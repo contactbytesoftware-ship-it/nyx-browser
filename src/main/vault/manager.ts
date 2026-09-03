@@ -74,9 +74,9 @@ export class VaultManager {
 
   async unlockWithPassword(password: string, totpCode: string): Promise<UnlockResult> {
     if (this.isLockedOut()) return { ok: false, reason: 'locked-out' }
-    const container = await this.loadContainer()
     let unlocked: { contents: VaultContentsV1; vaultKey: Buffer }
     try {
+      const container = await this.loadContainer()
       unlocked = containerUnlockWithPassword(container, password)
     } catch {
       this.registerFailure()
@@ -94,9 +94,9 @@ export class VaultManager {
 
   async unlockWithRecoveryKey(recoveryKey: string, newPassword: string): Promise<UnlockResult> {
     if (this.isLockedOut()) return { ok: false, reason: 'locked-out' }
-    const container = await this.loadContainer()
     let unlocked: { contents: VaultContentsV1; vaultKey: Buffer }
     try {
+      const container = await this.loadContainer()
       unlocked = containerUnlockWithRecoveryKey(container, recoveryKey)
     } catch {
       this.registerFailure()
