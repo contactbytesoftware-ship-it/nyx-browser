@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/renderer/src/**/*"]
+  "include": ["src/renderer/src/**/*", "src/shared/**/*"]
 }

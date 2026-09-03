@@ -9,6 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "devDependencies": {
