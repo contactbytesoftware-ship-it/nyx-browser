@@ -12,4 +12,5 @@ export interface VaultApi {
   unlockWithPassword(password: string, totpCode: string): Promise<UnlockResult>
   unlockWithRecoveryKey(recoveryKey: string, newPassword: string): Promise<UnlockResult>
   lock(): Promise<void>
+  onLocked(callback: () => void): () => void
 }

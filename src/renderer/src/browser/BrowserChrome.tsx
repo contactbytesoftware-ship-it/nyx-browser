@@ -35,6 +35,7 @@ export default function BrowserChrome(): JSX.Element {
         onActivate={(id) => window.nyx.tabs.activate(id)}
         onClose={(id) => window.nyx.tabs.close(id)}
         onNewTab={() => window.nyx.tabs.create('https://search.brave.com')}
+        onLock={() => window.nyx.vault.lock()}
       />
       <AddressBar tab={activeTab} />
     </div>

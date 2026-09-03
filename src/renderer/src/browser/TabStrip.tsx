@@ -5,9 +5,10 @@ interface TabStripProps {
   onActivate: (id: number) => void
   onClose: (id: number) => void
   onNewTab: () => void
+  onLock: () => void
 }
 
-export default function TabStrip({ tabs, onActivate, onClose, onNewTab }: TabStripProps): JSX.Element {
+export default function TabStrip({ tabs, onActivate, onClose, onNewTab, onLock }: TabStripProps): JSX.Element {
   return (
     <div className="tab-strip">
       {tabs.map((tab) => (
@@ -31,6 +32,9 @@ export default function TabStrip({ tabs, onActivate, onClose, onNewTab }: TabStr
       ))}
       <button className="tab-new" aria-label="New tab" onClick={onNewTab}>
         +
+      </button>
+      <button className="tab-lock" aria-label="Lock NYX Browser" onClick={onLock}>
+        Lock
       </button>
     </div>
   )

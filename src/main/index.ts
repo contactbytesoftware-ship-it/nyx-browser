@@ -4,6 +4,8 @@ import { VaultManager } from './vault/manager'
 import { registerVaultIpc } from './vault/ipc'
 import { TabManager } from './tabs/manager'
 import { registerTabsIpc } from './tabs/ipc'
+import { attachLockShortcut } from './shortcuts'
+import { startIdleWatcher, DEFAULT_IDLE_TIMEOUT_SECONDS } from './idle'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -35,11 +37,26 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   app.setName('NYX Browser')
   const vault = new VaultManager(join(app.getPath('userData'), 'vault.nyx'))
-  registerVaultIpc(vault)
-
   const win = createWindow()
-  const tabs = new TabManager(win)
+
+  let tabs: TabManager
+  const lock = (): void => {
+    if (!vault.isUnlocked) return
+    vault.lock()
+    tabs.hideActive()
+    win.webContents.send('vault:locked')
+  }
+  const unlock = (): void => {
+    tabs.showActive()
+  }
+
+  tabs = new TabManager(win, (wc) => attachLockShortcut(wc, lock))
+  registerVaultIpc(vault, lock, unlock)
   registerTabsIpc(win, tabs)
+  attachLockShortcut(win.webContents, lock)
+
+  const stopIdleWatcher = startIdleWatcher(DEFAULT_IDLE_TIMEOUT_SECONDS, lock)
+  win.on('closed', stopIdleWatcher)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

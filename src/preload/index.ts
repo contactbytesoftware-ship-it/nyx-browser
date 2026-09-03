@@ -9,7 +9,12 @@ const vaultApi: VaultApi = {
   unlockWithPassword: (password, totpCode) => ipcRenderer.invoke('vault:unlockWithPassword', password, totpCode),
   unlockWithRecoveryKey: (recoveryKey, newPassword) =>
     ipcRenderer.invoke('vault:unlockWithRecoveryKey', recoveryKey, newPassword),
-  lock: () => ipcRenderer.invoke('vault:lock')
+  lock: () => ipcRenderer.invoke('vault:lock'),
+  onLocked: (callback) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('vault:locked', listener)
+    return () => ipcRenderer.removeListener('vault:locked', listener)
+  }
 }
 
 const tabsApi: TabsApi = {
