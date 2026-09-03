@@ -1,0 +1,60 @@
+.auth-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 360px;
+  margin: 10vh auto;
+  padding: 24px;
+  color: #e6e6e6;
+  font-family: system-ui, sans-serif;
+}
+
+.auth-screen h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.auth-screen input {
+  background: #1c1c1f;
+  border: 1px solid #333;
+  color: #e6e6e6;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.auth-screen button {
+  background: #6c4cf1;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.auth-screen button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-screen .auth-link {
+  background: none;
+  color: #9d8cf5;
+  padding: 0;
+  text-align: left;
+}
+
+.auth-screen .auth-error {
+  color: #f16c6c;
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-screen code {
+  background: #1c1c1f;
+  padding: 8px;
+  border-radius: 6px;
+  word-break: break-all;
+  font-size: 13px;
+}
