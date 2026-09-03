@@ -7,6 +7,10 @@ import { registerTabsIpc } from './tabs/ipc'
 import { attachLockShortcut } from './shortcuts'
 import { startIdleWatcher, DEFAULT_IDLE_TIMEOUT_SECONDS } from './idle'
 
+// Must run before anything reads app.getPath('userData'), which is derived from
+// the app name — so at module scope, not inside app.whenReady().
+app.setName('NYX Browser')
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -35,7 +39,6 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
-  app.setName('NYX Browser')
   const vault = new VaultManager(join(app.getPath('userData'), 'vault.nyx'))
   const win = createWindow()
 
@@ -57,6 +60,9 @@ app.whenReady().then(() => {
 
   const stopIdleWatcher = startIdleWatcher(DEFAULT_IDLE_TIMEOUT_SECONDS, lock)
   win.on('closed', stopIdleWatcher)
+
+  // Zero the in-memory vault key on quit, per the spec's key-hygiene requirement.
+  app.on('will-quit', () => vault.lock())
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

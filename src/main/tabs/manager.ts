@@ -1,8 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { BrowserWindow, WebContentsView } from 'electron'
 import type { TabInfo } from '../../shared/tab-types'
-
-const CHROME_HEIGHT = 88
+import { CHROME_HEIGHT } from '../../shared/layout'
 
 export class TabManager extends EventEmitter {
   private views = new Map<number, WebContentsView>()
@@ -36,6 +35,10 @@ export class TabManager extends EventEmitter {
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
     })
     const wc = view.webContents
+    // Deny window.open() outright. An unmanaged top-level BrowserWindow would never
+    // be tracked in `views`, never hidden by hideActive() on lock, and would keep
+    // showing web content after the vault locks — a hole in the auto-lock guarantee.
+    wc.setWindowOpenHandler(() => ({ action: 'deny' }))
     wc.on('page-title-updated', () => this.emitChanged())
     wc.on('did-navigate', () => this.emitChanged())
     wc.on('did-navigate-in-page', () => this.emitChanged())

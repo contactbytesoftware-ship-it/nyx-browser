@@ -1,0 +1,24 @@
+/*
+ * Global reset. Imported first in main.tsx so it lands ahead of every component
+ * stylesheet.
+ *
+ * The UA-default `body { margin: 8px }` shifted `.browser-chrome` away from the
+ * window's true top-left, while the main process positions each tab's
+ * WebContentsView at a hardcoded y = CHROME_HEIGHT relative to the window's
+ * content bounds — so the chrome and the tab view stopped lining up and the
+ * title-bar drag region no longer reached the real top edge.
+ *
+ * The body background also matters: `.auth-screen` sets `color: #e6e6e6` with no
+ * background of its own, so without this the setup/unlock/recovery text rendered
+ * near-white on the default white page.
+ */
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: #1a1a1d;
+}
