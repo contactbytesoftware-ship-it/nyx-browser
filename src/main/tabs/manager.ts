@@ -68,10 +68,11 @@ export class TabManager extends EventEmitter {
     if (this.activeId === id) this.window.contentView.removeChildView(view)
     view.webContents.close()
     this.views.delete(id)
+    const closedIndex = this.order.indexOf(id)
     this.order = this.order.filter((tabId) => tabId !== id)
     if (this.activeId === id) {
       this.activeId = null
-      const next = this.order[this.order.length - 1]
+      const next = this.order[Math.min(closedIndex, this.order.length - 1)]
       if (next !== undefined) this.activateTab(next)
     }
     this.emitChanged()
