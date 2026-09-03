@@ -9,7 +9,15 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
-    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts') } } }
+    build: {
+      rollupOptions: {
+        input: { index: resolve(__dirname, 'src/preload/index.ts') },
+        // Electron refuses to load an ESM preload script when `sandbox: true`, and
+        // package.json's `"type": "module"` makes a bare `.js` file ESM — so the
+        // preload must be emitted as CommonJS with an explicit `.cjs` extension.
+        output: { format: 'cjs', entryFileNames: 'index.cjs' }
+      }
+    }
   },
   renderer: {
     root: 'src/renderer',
