@@ -1,0 +1,93 @@
+.browser-chrome {
+  display: flex;
+  flex-direction: column;
+  height: 88px;
+  background: #1a1a1d;
+  color: #e6e6e6;
+  font-family: system-ui, sans-serif;
+}
+
+.tab-strip {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 140px 0 8px;
+  gap: 4px;
+  -webkit-app-region: drag;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 30px;
+  border-radius: 6px;
+  background: #26262b;
+  max-width: 200px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.tab-active {
+  background: #34343c;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.tab-close,
+.tab-new {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+  -webkit-app-region: no-drag;
+}
+
+.tab-close {
+  font-size: 14px;
+}
+
+.tab-new {
+  font-size: 16px;
+}
+
+.address-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 8px;
+  background: #111113;
+}
+
+.address-bar button {
+  background: #26262b;
+  border: none;
+  color: inherit;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.address-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.address-input {
+  flex: 1;
+  background: #26262b;
+  border: 1px solid #333;
+  color: #e6e6e6;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
