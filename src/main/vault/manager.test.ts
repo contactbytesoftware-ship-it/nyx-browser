@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { TOTP, Secret } from 'otpauth'
 import { VaultManager } from './manager'
+import { createContainer, serializeContainer, VaultContentsV1 } from './container'
+
+const RECOVERY_KEY_FORMAT = /^[A-Z2-9]{4}(-[A-Z2-9]{4}){5}$/
+
+/** scrypt at N=2^17 makes these tests derivation-bound rather than logic-bound. */
+const SLOW = 30_000
 
 let dir: string
 let vaultPath: string
@@ -85,7 +91,7 @@ describe('unlockWithRecoveryKey', () => {
     const manager = new VaultManager(vaultPath)
     const { recoveryKey } = await manager.setup('old password')
     const result = await manager.unlockWithRecoveryKey(recoveryKey, 'new password')
-    expect(result).toEqual({ ok: true })
+    expect(result.ok).toBe(true)
     expect(manager.isUnlocked).toBe(true)
     manager.lock()
 
@@ -100,4 +106,92 @@ describe('unlockWithRecoveryKey', () => {
     expect(result.ok).toBe(false)
     expect(manager.isUnlocked).toBe(false)
   })
+
+  // The whole recovery contract in one test: recovery rotates the key, the old one
+  // dies, and the new one is actually handed back to the caller. If the returned
+  // key were dropped (as it once was) the vault's real recovery key would exist
+  // nowhere retrievable and the next recovery would be impossible.
+  it(
+    'returns the rotated recovery key: the old one stops working, the new one unlocks',
+    async () => {
+      const manager = new VaultManager(vaultPath)
+      const { recoveryKey: originalKey } = await manager.setup('old password')
+
+      const first = await manager.unlockWithRecoveryKey(originalKey, 'first new password')
+      expect(first.ok).toBe(true)
+      if (!first.ok) return
+      expect(first.recoveryKey).toMatch(RECOVERY_KEY_FORMAT)
+      expect(first.recoveryKey).not.toBe(originalKey)
+
+      // (a) The OLD recovery key is rejected. A fresh manager is used so the
+      // attempt goes through the on-disk vault and its own backoff counter.
+      const withOldKey = new VaultManager(vaultPath)
+      expect(await withOldKey.unlockWithRecoveryKey(originalKey, 'another password')).toEqual({
+        ok: false,
+        reason: 'wrong-credentials'
+      })
+
+      // (b) The NEW recovery key from the result really does unlock the vault.
+      const withNewKey = new VaultManager(vaultPath)
+      const second = await withNewKey.unlockWithRecoveryKey(first.recoveryKey, 'second new password')
+      expect(second.ok).toBe(true)
+      expect(withNewKey.isUnlocked).toBe(true)
+      if (!second.ok) return
+      expect(second.recoveryKey).not.toBe(first.recoveryKey)
+    },
+    SLOW
+  )
+})
+
+describe('corrupt and unsupported vaults', () => {
+  it('reports corruption rather than wrong credentials, and backs the bad file up', async () => {
+    const manager = new VaultManager(vaultPath)
+    await manager.setup('correct horse battery staple')
+
+    // Damage the vault after a valid one existed. A fresh manager is used so
+    // nothing is served from the in-memory container cache.
+    await writeFile(vaultPath, Buffer.from('this is not a vault file'))
+    const reopened = new VaultManager(vaultPath)
+
+    const result = await reopened.unlockWithPassword('correct horse battery staple', '000000')
+    expect(result).toEqual({ ok: false, reason: 'corrupt-vault' })
+    expect(reopened.isUnlocked).toBe(false)
+
+    // backupCorruptFile ran: the bad file was renamed aside, never deleted.
+    const entries = await readdir(dir)
+    expect(entries.some((name) => name.startsWith('vault.nyx.corrupt-'))).toBe(true)
+    expect(entries).not.toContain('vault.nyx')
+  })
+
+  it('reports corruption when the password is correct but the contents are damaged', async () => {
+    const manager = new VaultManager(vaultPath)
+    const { totpProvisioningUri } = await manager.setup('correct horse battery staple')
+    const secret = new URL(totpProvisioningUri).searchParams.get('secret')!
+
+    // Damage only the trailing mainBlob, leaving the magic header, both salts and
+    // both wrapped keys intact — so the password's auth tag still verifies (proving
+    // the password is right) but the vault body will not decrypt.
+    const raw = await readFile(vaultPath)
+    raw[raw.length - 1] ^= 0xff
+    await writeFile(vaultPath, raw)
+
+    const reopened = new VaultManager(vaultPath)
+    const result = await reopened.unlockWithPassword('correct horse battery staple', codeFor(secret))
+    expect(result).toEqual({ ok: false, reason: 'corrupt-vault' })
+  })
+
+  it('refuses a vault whose contents declare an unsupported version', async () => {
+    const futureContents = { version: 2, totpSecret: 'JBSWY3DPEHPK3PXP', settings: {} }
+    const container = createContainer(
+      'correct horse battery staple',
+      'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF',
+      futureContents as unknown as VaultContentsV1
+    )
+    await writeFile(vaultPath, serializeContainer(container))
+
+    const manager = new VaultManager(vaultPath)
+    const result = await manager.unlockWithPassword('correct horse battery staple', '000000')
+    expect(result).toEqual({ ok: false, reason: 'unsupported-version' })
+    expect(manager.isUnlocked).toBe(false)
+  }, SLOW)
 })

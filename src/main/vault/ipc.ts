@@ -15,9 +15,15 @@ export function registerVaultIpc(
     return result
   })
   ipcMain.handle('vault:unlockWithRecoveryKey', async (_event, recoveryKey: string, newPassword: string) => {
-    const result = await vault.unlockWithRecoveryKey(recoveryKey, newPassword)
-    if (result.ok) onUnlock()
-    return result
+    // Deliberately does NOT call onUnlock() here. Recovery rotates the recovery key,
+    // and the renderer must reveal the new one on a full-window screen first —
+    // attaching the tab WebContentsView now would cover it and the user would lose
+    // the only copy of their new key. The renderer calls vault:unlockComplete once
+    // that screen has been dismissed.
+    return vault.unlockWithRecoveryKey(recoveryKey, newPassword)
+  })
+  ipcMain.handle('vault:unlockComplete', () => {
+    if (vault.isUnlocked) onUnlock()
   })
   ipcMain.handle('vault:lock', () => onLock())
 }
