@@ -4,9 +4,11 @@ import { resolveAddressBarInput } from './resolveAddressBarInput'
 
 interface AddressBarProps {
   tab: TabInfo | null
+  /** Runs an IPC call, surfacing a rejection instead of leaving it unhandled. */
+  onRun: (action: () => Promise<unknown>) => void
 }
 
-export default function AddressBar({ tab }: AddressBarProps): JSX.Element {
+export default function AddressBar({ tab, onRun }: AddressBarProps): JSX.Element {
   const [input, setInput] = useState('')
 
   useEffect(() => {
@@ -16,18 +18,22 @@ export default function AddressBar({ tab }: AddressBarProps): JSX.Element {
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault()
     if (!tab) return
-    window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input))
+    onRun(() => window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input)))
   }
 
   return (
     <form className="address-bar" onSubmit={handleSubmit}>
-      <button type="button" disabled={!tab?.canGoBack} onClick={() => tab && window.nyx.tabs.goBack(tab.id)}>
+      <button type="button" disabled={!tab?.canGoBack} onClick={() => tab && onRun(() => window.nyx.tabs.goBack(tab.id))}>
         ←
       </button>
-      <button type="button" disabled={!tab?.canGoForward} onClick={() => tab && window.nyx.tabs.goForward(tab.id)}>
+      <button
+        type="button"
+        disabled={!tab?.canGoForward}
+        onClick={() => tab && onRun(() => window.nyx.tabs.goForward(tab.id))}
+      >
         →
       </button>
-      <button type="button" onClick={() => tab && window.nyx.tabs.reload(tab.id)}>
+      <button type="button" onClick={() => tab && onRun(() => window.nyx.tabs.reload(tab.id))}>
         ⟳
       </button>
       <input

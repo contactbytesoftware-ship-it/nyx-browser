@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import RecoveryScreen from './RecoveryScreen'
+import { GENERIC_ERROR, vaultErrorMessage } from '../errors'
 
 interface UnlockScreenProps {
   onUnlocked: () => void
@@ -9,6 +10,7 @@ export default function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Ele
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const [showRecovery, setShowRecovery] = useState(false)
 
   if (showRecovery) {
@@ -16,15 +18,22 @@ export default function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Ele
   }
 
   async function handleUnlock(): Promise<void> {
-    const result = await window.nyx.vault.unlockWithPassword(password, code)
-    if (result.ok) {
-      onUnlocked()
-      return
+    setBusy(true)
+    try {
+      const result = await window.nyx.vault.unlockWithPassword(password, code)
+      if (result.ok) {
+        // Tab content is already attached by the main process for this path.
+        onUnlocked()
+        return
+      }
+      setError(vaultErrorMessage(result.reason, 'Incorrect password or code.'))
+      setCode('')
+    } catch {
+      setError(GENERIC_ERROR)
+      setCode('')
+    } finally {
+      setBusy(false)
     }
-    setError(
-      result.reason === 'locked-out' ? 'Too many attempts. Wait a moment and try again.' : 'Incorrect password or code.'
-    )
-    setCode('')
   }
 
   return (
@@ -44,7 +53,9 @@ export default function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Ele
         maxLength={6}
       />
       {error && <p className="auth-error">{error}</p>}
-      <button onClick={handleUnlock}>Unlock</button>
+      <button disabled={busy} onClick={handleUnlock}>
+        {busy ? 'Unlocking…' : 'Unlock'}
+      </button>
       <button className="auth-link" onClick={() => setShowRecovery(true)}>Forgot password?</button>
     </div>
   )

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import QRCode from 'qrcode'
+import { GENERIC_ERROR } from '../errors'
 
 interface SetupScreenProps {
   onComplete: () => void
@@ -9,6 +10,7 @@ type Step = 'password' | 'reveal'
 
 export default function SetupScreen({ onComplete }: SetupScreenProps): JSX.Element {
   const [step, setStep] = useState<Step>('password')
+  const [busy, setBusy] = useState(false)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
@@ -27,11 +29,20 @@ export default function SetupScreen({ onComplete }: SetupScreenProps): JSX.Eleme
       return
     }
     setError('')
-    const result = await window.nyx.vault.setup(password)
-    setRecoveryKey(result.recoveryKey)
-    setManualSecret(new URL(result.totpProvisioningUri).searchParams.get('secret') ?? '')
-    setQrDataUrl(await QRCode.toDataURL(result.totpProvisioningUri))
-    setStep('reveal')
+    setBusy(true)
+    try {
+      const result = await window.nyx.vault.setup(password)
+      setRecoveryKey(result.recoveryKey)
+      setManualSecret(new URL(result.totpProvisioningUri).searchParams.get('secret') ?? '')
+      setQrDataUrl(await QRCode.toDataURL(result.totpProvisioningUri))
+      setStep('reveal')
+    } catch {
+      // A main-process throw (disk full, permission error) must never leave the
+      // button looking like it simply did nothing.
+      setError(GENERIC_ERROR)
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (step === 'reveal') {
@@ -73,7 +84,9 @@ export default function SetupScreen({ onComplete }: SetupScreenProps): JSX.Eleme
         onChange={(e) => setConfirmPassword(e.target.value)}
       />
       {error && <p className="auth-error">{error}</p>}
-      <button onClick={handleCreate}>Create vault</button>
+      <button disabled={busy} onClick={handleCreate}>
+        {busy ? 'Creating…' : 'Create vault'}
+      </button>
     </div>
   )
 }

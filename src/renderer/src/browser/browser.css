@@ -1,7 +1,10 @@
 .browser-chrome {
+  position: relative;
   display: flex;
   flex-direction: column;
-  height: 88px;
+  /* Set from src/shared/layout.ts in main.tsx; must match the main process's
+     CHROME_HEIGHT or the tab WebContentsView stops lining up with the chrome. */
+  height: var(--chrome-height, 88px);
   background: #1a1a1d;
   color: #e6e6e6;
   font-family: system-ui, sans-serif;
@@ -91,6 +94,25 @@
 .address-bar button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Overlays the right end of the address bar. Must stay inside the chrome's fixed
+   --chrome-height band: anything below it is covered by the tab WebContentsView. */
+.chrome-error {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  margin: 0;
+  max-width: 45%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #3a1f24;
+  color: #f16c6c;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .address-input {
