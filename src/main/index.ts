@@ -11,6 +11,7 @@ import { startIdleWatcher, DEFAULT_IDLE_TIMEOUT_SECONDS } from './idle'
 import { SettingsManager } from './settings/manager'
 import { registerSettingsIpc } from './settings/ipc'
 import { attachAdBlock } from './adblock/session'
+import { attachAutoUpdater, registerUpdaterIpc } from './updater/manager'
 import { titleBarOverlayFor } from './titleBarOverlay'
 import type { SettingsV1 } from '../shared/settings-types'
 
@@ -97,9 +98,11 @@ app.whenReady().then(async () => {
   registerTabsIpc(win, tabs)
   registerCredentialsIpc(vault, tabs)
   registerSettingsIpc(settings, applyTitleBarTheme)
+  registerUpdaterIpc()
   attachLockShortcut(win.webContents, lock)
   attachFillShortcut(win.webContents, requestFill)
   attachAdBlock(session.defaultSession, () => settings.get().adBlockEnabled)
+  attachAutoUpdater(win)
 
   const stopIdleWatcher = startIdleWatcher(DEFAULT_IDLE_TIMEOUT_SECONDS, lock)
   win.on('closed', stopIdleWatcher)
