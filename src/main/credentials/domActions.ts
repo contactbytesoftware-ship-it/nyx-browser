@@ -21,7 +21,11 @@ const CAPTURE_SCRIPT = `
 export async function captureSubmittedCredential(webContents: WebContents): Promise<CapturedCredential | null> {
   try {
     const result = await webContents.executeJavaScript(CAPTURE_SCRIPT)
-    return result ?? null
+    // Untrusted: the value comes back from the page's own context, and a page that
+    // overrides document.querySelector (or otherwise interferes with the script
+    // above) can resolve anything at all. Only a well-formed capture is accepted.
+    if (!result || typeof result.username !== 'string' || typeof result.password !== 'string') return null
+    return { username: result.username, password: result.password }
   } catch {
     // The page may already be tearing down for navigation, or block script
     // execution entirely — either way, no capture, never a crash.
@@ -29,7 +33,8 @@ export async function captureSubmittedCredential(webContents: WebContents): Prom
   }
 }
 
-function fillScript(username: string, password: string): string {
+/** Exported for testing: this is a pure string builder, no WebContents needed. */
+export function fillScript(username: string, password: string): string {
   // JSON.stringify safely embeds these strings into the script text regardless
   // of what characters they contain (quotes, backticks, `${...}`) — the values
   // come from our own vault, not from the page, but this is still the correct
@@ -63,11 +68,19 @@ export async function fillCredential(webContents: WebContents, username: string,
   }
 }
 
+/**
+ * @param isEnabled gate checked on every navigation, BEFORE the capture script
+ *   runs. Tabs survive a vault lock (they are only detached from the window) and
+ *   can still navigate, so this is what stops a locked vault from reaching into
+ *   background pages and pulling plaintext passwords out of them.
+ */
 export function attachCredentialCapture(
   webContents: WebContents,
-  onCapture: (capture: CapturedCredential & { domain: string }) => void
+  onCapture: (capture: CapturedCredential & { domain: string }) => void,
+  isEnabled: () => boolean = () => true
 ): void {
   webContents.on('will-navigate', () => {
+    if (!isEnabled()) return
     let domain: string | null
     try {
       domain = new URL(webContents.getURL()).hostname || null

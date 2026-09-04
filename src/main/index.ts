@@ -61,7 +61,19 @@ app.whenReady().then(() => {
   tabs = new TabManager(win, (wc) => {
     attachLockShortcut(wc, lock)
     attachFillShortcut(wc, requestFill)
-    attachCredentialCapture(wc, (capture) => win.webContents.send('credentials:submissionDetected', capture))
+    // Tabs stay alive after a lock (hideActive only detaches the view), so they can
+    // still navigate — but a locked vault must not keep extracting plaintext
+    // passwords out of background pages.
+    attachCredentialCapture(
+      wc,
+      (capture) => {
+        // Re-checked here too: the capture is async, so the vault can lock between
+        // the navigation gate above and this callback resolving.
+        if (!vault.isUnlocked) return
+        win.webContents.send('credentials:submissionDetected', capture)
+      },
+      () => vault.isUnlocked
+    )
   })
   registerVaultIpc(vault, lock, unlock)
   registerTabsIpc(win, tabs)
