@@ -1,19 +1,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { TabInfo } from '../../../shared/tab-types'
 import type { CredentialV1 } from '../../../shared/credential-types'
+import type { SettingsV1 } from '../../../shared/settings-types'
 import TabStrip from './TabStrip'
 import AddressBar from './AddressBar'
 import CredentialBanner from '../credentials/CredentialBanner'
+import SettingsPanel from '../settings/SettingsPanel'
 import { extractHostname } from '../credentials/extractHostname'
+import { applyTheme } from '../applyTheme'
 import { GENERIC_ERROR } from '../errors'
 import './browser.css'
 
 const ERROR_DISMISS_MS = 5000
+const DEFAULT_SEARCH_TEMPLATE = 'https://search.brave.com/search?q=%s'
 
 interface SubmissionCapture {
   domain: string
   username: string
   password: string
+}
+
+function defaultSearchUrlTemplate(current: SettingsV1 | null): string {
+  if (!current) return DEFAULT_SEARCH_TEMPLATE
+  const engine = current.searchEngines.find((e) => e.id === current.defaultSearchEngineId)
+  return engine?.urlTemplate ?? DEFAULT_SEARCH_TEMPLATE
 }
 
 export default function BrowserChrome(): JSX.Element {
@@ -22,6 +32,8 @@ export default function BrowserChrome(): JSX.Element {
   const [activeCredential, setActiveCredential] = useState<CredentialV1 | null>(null)
   const [fillConfirmPending, setFillConfirmPending] = useState(false)
   const [saveCapture, setSaveCapture] = useState<SubmissionCapture | null>(null)
+  const [settings, setSettings] = useState<SettingsV1 | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   /**
    * Runs a fire-and-forget IPC call. Without this, a main-process throw becomes an
@@ -36,6 +48,10 @@ export default function BrowserChrome(): JSX.Element {
     const timer = setTimeout(() => setError(''), ERROR_DISMISS_MS)
     return () => clearTimeout(timer)
   }, [error])
+
+  useEffect(() => {
+    window.nyx.settings.get().then(setSettings).catch(() => setError(GENERIC_ERROR))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -104,6 +120,26 @@ export default function BrowserChrome(): JSX.Element {
     if (activeCredential === null) setFillConfirmPending(false)
   }, [activeCredential])
 
+  function openSettings(): void {
+    run(() => window.nyx.tabs.hideActive())
+    setShowSettings(true)
+  }
+
+  function closeSettings(): void {
+    run(() => window.nyx.tabs.showActive())
+    setShowSettings(false)
+  }
+
+  function handleSettingsChange(next: SettingsV1): void {
+    setSettings(next)
+    applyTheme(next)
+    run(() => window.nyx.settings.update(next))
+  }
+
+  if (showSettings && settings) {
+    return <SettingsPanel settings={settings} onChange={handleSettingsChange} onClose={closeSettings} />
+  }
+
   return (
     <div className="browser-chrome">
       <TabStrip
@@ -112,12 +148,14 @@ export default function BrowserChrome(): JSX.Element {
         onClose={(id) => run(() => window.nyx.tabs.close(id))}
         onNewTab={() => run(() => window.nyx.tabs.create('https://search.brave.com'))}
         onLock={() => run(() => window.nyx.vault.lock())}
+        onOpenSettings={openSettings}
       />
       <AddressBar
         tab={activeTab}
         onRun={run}
         hasCredential={activeCredential !== null}
         onFillRequest={() => setFillConfirmPending(true)}
+        searchUrlTemplate={defaultSearchUrlTemplate(settings)}
       />
       {fillConfirmPending && activeCredential && (
         <CredentialBanner
@@ -145,9 +183,6 @@ export default function BrowserChrome(): JSX.Element {
               onClick: () => {
                 const capture = saveCapture
                 setSaveCapture(null)
-                // The domain-lookup effect only re-runs on a URL change, so adopt
-                // the saved credential directly — otherwise the Fill button would
-                // not appear until the user navigated away and back.
                 run(async () => {
                   const credential = await window.nyx.credentials.save(
                     capture.domain,

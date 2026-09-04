@@ -9,11 +9,18 @@ interface AddressBarProps {
   onRun: (action: () => Promise<unknown>) => void
   hasCredential: boolean
   onFillRequest: () => void
+  searchUrlTemplate: string
 }
 
 const COPIED_RESET_MS = 2000
 
-export default function AddressBar({ tab, onRun, hasCredential, onFillRequest }: AddressBarProps): JSX.Element {
+export default function AddressBar({
+  tab,
+  onRun,
+  hasCredential,
+  onFillRequest,
+  searchUrlTemplate
+}: AddressBarProps): JSX.Element {
   const [input, setInput] = useState('')
   const [justGenerated, setJustGenerated] = useState(false)
 
@@ -30,9 +37,7 @@ export default function AddressBar({ tab, onRun, hasCredential, onFillRequest }:
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault()
     if (!tab) return
-    // TODO(Task 6): replace this hardcoded template with the user's configured
-    // default search engine once the Settings screen exists.
-    onRun(() => window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input, 'https://search.brave.com/search?q=%s')))
+    onRun(() => window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input, searchUrlTemplate)))
   }
 
   async function handleGenerate(): Promise<void> {

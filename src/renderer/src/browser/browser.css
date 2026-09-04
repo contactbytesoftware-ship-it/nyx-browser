@@ -72,6 +72,17 @@
   -webkit-app-region: no-drag;
 }
 
+.tab-settings {
+  background: #26262b;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  -webkit-app-region: no-drag;
+}
+
 .address-bar {
   display: flex;
   align-items: center;
