@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { deriveKey, encrypt, decrypt, encryptJSON, decryptJSON, SALT_LEN, KEY_LEN, NONCE_LEN, AUTH_TAG_LEN } from './crypto'
+import type { CredentialV1 } from '../../shared/credential-types'
 
 /** The only vault content version this build understands. */
 export const VAULT_VERSION = 1
@@ -8,6 +9,7 @@ export interface VaultContentsV1 {
   version: 1
   totpSecret: string
   settings: Record<string, unknown>
+  credentials: CredentialV1[]
 }
 
 /**
@@ -89,4 +91,8 @@ export function parseContainer(raw: Buffer): VaultContainer {
   const recoveryWrappedKey = raw.subarray(offset, (offset += WRAPPED_KEY_LEN))
   const mainBlob = raw.subarray(offset)
   return { passwordSalt, passwordWrappedKey, recoverySalt, recoveryWrappedKey, mainBlob }
+}
+
+export function updateContainerContents(container: VaultContainer, vaultKey: Buffer, contents: VaultContentsV1): VaultContainer {
+  return { ...container, mainBlob: encryptJSON(contents, vaultKey) }
 }
