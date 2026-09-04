@@ -143,7 +143,29 @@ export default function BrowserChrome(): JSX.Element {
     if (activeCredential === null) setFillConfirmPending(false)
   }, [activeCredential])
 
-  useEffect(() => window.nyx.updater.onUpdateReady((version) => setUpdateReady(version)), [])
+  // Asks the main process for the real state on mount, not just for pushes from
+  // here on — same reasoning as AuthGate's vault.isUnlocked() call. The download
+  // usually completes while the vault is still locked and this component does not
+  // exist, and re-locking unmounts it again; a subscription alone would silently
+  // drop the banner for the whole session in both cases.
+  useEffect(() => {
+    let cancelled = false
+    window.nyx.updater
+      .getReady()
+      .then((version) => {
+        if (!cancelled && version) setUpdateReady(version)
+      })
+      .catch((err) => {
+        // Not user-visible: a missed banner still installs on the next quit, so
+        // surfacing the generic error bar here would be noise.
+        console.warn('Failed to read pending update state:', err)
+      })
+    const unsubscribe = window.nyx.updater.onUpdateReady((version) => setUpdateReady(version))
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
 
   function openSettings(): void {
     run(() => window.nyx.tabs.hideActive())
@@ -250,7 +272,7 @@ export default function BrowserChrome(): JSX.Element {
             {
               label: 'Restart Now',
               primary: true,
-              onClick: () => run(() => Promise.resolve(window.nyx.updater.restartNow()))
+              onClick: () => run(() => window.nyx.updater.restartNow())
             },
             { label: 'Later', onClick: () => setUpdateReady(null) }
           ]}

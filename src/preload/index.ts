@@ -72,6 +72,7 @@ const updaterApi: UpdaterApi = {
     ipcRenderer.on('updater:ready', listener)
     return () => ipcRenderer.removeListener('updater:ready', listener)
   },
+  getReady: () => ipcRenderer.invoke('updater:getReady'),
   restartNow: () => ipcRenderer.invoke('updater:restartNow')
 }
 
