@@ -250,7 +250,7 @@ export default function BrowserChrome(): JSX.Element {
             {
               label: 'Restart Now',
               primary: true,
-              onClick: () => window.nyx.updater.restartNow()
+              onClick: () => run(() => Promise.resolve(window.nyx.updater.restartNow()))
             },
             { label: 'Later', onClick: () => setUpdateReady(null) }
           ]}
