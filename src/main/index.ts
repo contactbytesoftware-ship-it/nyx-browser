@@ -11,19 +11,24 @@ import { startIdleWatcher, DEFAULT_IDLE_TIMEOUT_SECONDS } from './idle'
 import { SettingsManager } from './settings/manager'
 import { registerSettingsIpc } from './settings/ipc'
 import { attachAdBlock } from './adblock/session'
+import { titleBarOverlayFor } from './titleBarOverlay'
+import type { SettingsV1 } from '../shared/settings-types'
 
 // Must run before anything reads app.getPath('userData'), which is derived from
 // the app name — so at module scope, not inside app.whenReady().
 app.setName('NYX Browser')
 
-function createWindow(): BrowserWindow {
+function createWindow(theme: SettingsV1['theme']): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#1a1a1d', symbolColor: '#e6e6e6', height: 40 },
+    // Taken from settings rather than hardcoded dark: settings are already loaded
+    // by the time this runs, so a light-themed profile gets light caption buttons
+    // from the very first frame instead of after the first theme change.
+    titleBarOverlay: titleBarOverlayFor(theme),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -46,7 +51,16 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(async () => {
   const vault = new VaultManager(join(app.getPath('userData'), 'vault.nyx'))
   const settings = await SettingsManager.create(join(app.getPath('userData'), 'settings.json'))
-  const win = createWindow()
+  const win = createWindow(settings.get().theme)
+
+  // The caption buttons are native chrome, so nothing in the renderer can restyle
+  // them — the main process has to push the new colors on every theme change or a
+  // light-themed window keeps a dark caption strip. `setTitleBarOverlay` is
+  // win32/linux only.
+  const applyTitleBarTheme = (theme: SettingsV1['theme']): void => {
+    if (process.platform === 'darwin' || win.isDestroyed()) return
+    win.setTitleBarOverlay(titleBarOverlayFor(theme))
+  }
 
   let tabs: TabManager
   const lock = (): void => {
@@ -82,7 +96,7 @@ app.whenReady().then(async () => {
   registerVaultIpc(vault, lock, unlock)
   registerTabsIpc(win, tabs)
   registerCredentialsIpc(vault, tabs)
-  registerSettingsIpc(settings)
+  registerSettingsIpc(settings, applyTitleBarTheme)
   attachLockShortcut(win.webContents, lock)
   attachFillShortcut(win.webContents, requestFill)
   attachAdBlock(session.defaultSession, () => settings.get().adBlockEnabled)
@@ -94,7 +108,7 @@ app.whenReady().then(async () => {
   app.on('will-quit', () => vault.lock())
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(settings.get().theme)
   })
 })
 
