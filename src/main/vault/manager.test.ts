@@ -269,4 +269,80 @@ describe('credentials', () => {
     expect(() => manager.listCredentials()).toThrow()
     await expect(manager.saveCredential('example.com', 'me', 'hunter2')).rejects.toThrow()
   })
+
+  it('preserves existing notes when re-saving without them, and replaces them when given', async () => {
+    const manager = await unlockedManager()
+    await manager.saveCredential('example.com', 'me', 'hunter2', 'recovery email: me@example.com')
+    // The save banner never collects notes, so a capture-driven re-save passes
+    // `notes` as undefined — that must mean "unchanged", not "clear it".
+    const resaved = await manager.saveCredential('example.com', 'me', 'newpass')
+    expect(resaved.notes).toBe('recovery email: me@example.com')
+    expect(manager.getCredentialForDomain('example.com')?.notes).toBe('recovery email: me@example.com')
+    const replaced = await manager.saveCredential('example.com', 'me', 'newpass', 'replaced')
+    expect(replaced.notes).toBe('replaced')
+  })
+
+  it('returns copies, so mutating a returned credential never reaches vault state', async () => {
+    const manager = await unlockedManager()
+    const saved = await manager.saveCredential('example.com', 'me', 'hunter2')
+    saved.password = 'tampered at save time'
+
+    const list = manager.listCredentials()
+    list[0].password = 'tampered'
+    list.pop()
+    const fetched = manager.getCredentialForDomain('example.com')!
+    fetched.password = 'tampered too'
+
+    expect(manager.listCredentials()).toHaveLength(1)
+    expect(manager.getCredentialForDomain('example.com')?.password).toBe('hunter2')
+  })
+
+  it('does not commit a credential change to memory when the disk write fails', async () => {
+    const manager = await unlockedManager()
+    const first = await manager.saveCredential('example.com', 'me', 'hunter2')
+
+    // Removing the vault's directory makes saveRawFile's temp-file write throw,
+    // so the persist fails after the candidate contents were built but before
+    // anything was committed.
+    await rm(dir, { recursive: true, force: true })
+
+    await expect(manager.saveCredential('other.com', 'you', 'sekrit')).rejects.toThrow()
+    expect(manager.listCredentials()).toEqual([first])
+
+    await expect(manager.deleteCredential(first.id)).rejects.toThrow()
+    expect(manager.listCredentials()).toEqual([first])
+  })
+
+  it(
+    'opens a Phase-1 vault that has no credentials array and treats it as empty',
+    async () => {
+      // Reproduces the on-disk shape Phase 1's setup() wrote: no `credentials` key
+      // at all. It decrypts and passes the version check, so without normalization
+      // in openContents every method below would throw on `undefined`.
+      const secret = 'JBSWY3DPEHPK3PXP'
+      const legacy = { version: 1, totpSecret: secret, settings: {} } as unknown as VaultContentsV1
+      const container = createContainer(
+        'correct horse battery staple',
+        'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF',
+        legacy
+      )
+      await writeFile(vaultPath, serializeContainer(container))
+
+      const manager = new VaultManager(vaultPath)
+      expect(await manager.unlockWithPassword('correct horse battery staple', codeFor(secret))).toEqual({
+        ok: true
+      })
+      expect(manager.listCredentials()).toEqual([])
+      expect(manager.getCredentialForDomain('example.com')).toBeNull()
+
+      // ...and the first save upgrades the file in place.
+      const saved = await manager.saveCredential('example.com', 'me', 'hunter2')
+      expect(manager.listCredentials()).toEqual([saved])
+
+      const reopened = new VaultManager(vaultPath)
+      await reopened.unlockWithPassword('correct horse battery staple', codeFor(secret))
+      expect(reopened.listCredentials()).toEqual([saved])
+    },
+    SLOW
+  )
 })

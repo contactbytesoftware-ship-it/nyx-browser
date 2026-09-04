@@ -186,23 +186,33 @@ export class VaultManager {
     this.contents = null
   }
 
-  private async persistContents(): Promise<void> {
+  /**
+   * Writes `contents` to disk and only then commits it to memory. Callers build a
+   * candidate contents object and hand it here — nothing mutates `this.contents`
+   * until the write has actually succeeded, so a failed write leaves the in-memory
+   * state exactly matching what is still on disk rather than silently diverging.
+   */
+  private async persistContents(contents: VaultContentsV1): Promise<void> {
     if (!this.container || !this.vaultKey || !this.contents) {
       throw new Error('cannot persist credentials while the vault is locked')
     }
-    const updated = updateContainerContents(this.container, this.vaultKey, this.contents)
+    const updated = updateContainerContents(this.container, this.vaultKey, contents)
     await saveRawFile(this.vaultPath, serializeContainer(updated))
     this.container = updated
+    this.contents = contents
   }
 
+  /** CONTRACT: returns copies — mutating the result never touches vault state. */
   listCredentials(): CredentialV1[] {
     if (!this.contents) throw new Error('cannot list credentials while the vault is locked')
-    return [...this.contents.credentials]
+    return this.contents.credentials.map((c) => ({ ...c }))
   }
 
+  /** CONTRACT: returns a copy — mutating the result never touches vault state. */
   getCredentialForDomain(domain: string): CredentialV1 | null {
     if (!this.contents) throw new Error('cannot read credentials while the vault is locked')
-    return this.contents.credentials.find((c) => c.domain === domain) ?? null
+    const found = this.contents.credentials.find((c) => c.domain === domain)
+    return found ? { ...found } : null
   }
 
   async saveCredential(domain: string, username: string, password: string, notes?: string): Promise<CredentialV1> {
@@ -213,22 +223,29 @@ export class VaultManager {
       domain,
       username,
       password,
-      notes,
+      // An omitted `notes` on a re-save means "unchanged", not "clear it" — the
+      // save banner never collects notes, so overwriting unconditionally would
+      // wipe them on every capture-driven re-save.
+      notes: notes ?? existing?.notes,
       updatedAt: Date.now()
     }
-    this.contents = {
+    const nextContents: VaultContentsV1 = {
       ...this.contents,
       credentials: existing
         ? this.contents.credentials.map((c) => (c.domain === domain ? credential : c))
         : [...this.contents.credentials, credential]
     }
-    await this.persistContents()
-    return credential
+    await this.persistContents(nextContents)
+    // A copy, for the same reason listCredentials/getCredentialForDomain return copies.
+    return { ...credential }
   }
 
   async deleteCredential(id: string): Promise<void> {
     if (!this.contents) throw new Error('cannot delete a credential while the vault is locked')
-    this.contents = { ...this.contents, credentials: this.contents.credentials.filter((c) => c.id !== id) }
-    await this.persistContents()
+    const nextContents: VaultContentsV1 = {
+      ...this.contents,
+      credentials: this.contents.credentials.filter((c) => c.id !== id)
+    }
+    await this.persistContents(nextContents)
   }
 }
