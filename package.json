@@ -17,6 +17,10 @@
   "build": {
     "appId": "com.nyxbrowser.app",
     "productName": "NYX Browser",
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
     "win": {
       "target": "nsis"
     },
@@ -30,7 +34,8 @@
     "publish": {
       "provider": "github",
       "owner": "contactbytesoftware-ship-it",
-      "repo": "nyx-browser"
+      "repo": "nyx-browser",
+      "releaseType": "release"
     }
   },
   "devDependencies": {
