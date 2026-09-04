@@ -3,8 +3,11 @@ const LENGTH = 20
 
 function randomIndex(max: number): number {
   // Rejection sampling: discard draws that would introduce modulo bias when
-  // 2^32 isn't a multiple of `max` — the same technique the vault's
-  // recovery-key generator uses (src/main/vault/recovery.ts).
+  // 2^32 isn't a multiple of `max`. The vault's recovery-key generator
+  // (src/main/vault/recovery.ts) gets this for free via Node's `randomInt`,
+  // which rejection-samples internally — the renderer has no `randomInt`
+  // equivalent (no Node APIs here), so this hand-rolls the same idea using
+  // Web Crypto's `getRandomValues`.
   const limit = Math.floor(0x100000000 / max) * max
   const buf = new Uint32Array(1)
   let value: number
