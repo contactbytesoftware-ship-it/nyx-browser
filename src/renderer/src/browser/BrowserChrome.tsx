@@ -96,6 +96,10 @@ export default function BrowserChrome(): JSX.Element {
     [activeCredential]
   )
 
+  useEffect(() => {
+    if (activeCredential === null) setFillConfirmPending(false)
+  }, [activeCredential])
+
   return (
     <div className="browser-chrome">
       <TabStrip
