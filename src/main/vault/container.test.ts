@@ -58,6 +58,46 @@ describe('serializeContainer + parseContainer', () => {
   })
 })
 
+describe('opening a pre-Phase-2 vault (no `credentials` key)', () => {
+  // Phase 1's setup() wrote contents with no `credentials` field at all. Such a
+  // vault decrypts fine and passes the version check, so without normalization on
+  // read every credential method downstream would blow up on `undefined`.
+  const legacyContents = {
+    version: 1,
+    totpSecret: 'JBSWY3DPEHPK3PXP',
+    settings: { theme: 'dark' }
+  } as unknown as VaultContentsV1
+
+  it('normalizes the missing credentials array to [] on the password unlock path', () => {
+    const container = createContainer('correct horse', 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF', legacyContents)
+    const { contents } = unlockWithPassword(container, 'correct horse')
+    expect(contents.credentials).toEqual([])
+    expect(contents.totpSecret).toBe('JBSWY3DPEHPK3PXP')
+    expect(contents.settings).toEqual({ theme: 'dark' })
+  })
+
+  it('normalizes the missing credentials array to [] on the recovery unlock path', () => {
+    const container = createContainer('correct horse', 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF', legacyContents)
+    const { contents } = unlockWithRecoveryKey(container, 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF')
+    expect(contents.credentials).toEqual([])
+  })
+
+  it('survives a serialize/parse round-trip of a legacy vault file', () => {
+    const container = createContainer('correct horse', 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF', legacyContents)
+    const parsed = parseContainer(serializeContainer(container))
+    expect(unlockWithPassword(parsed, 'correct horse').contents.credentials).toEqual([])
+  })
+
+  it('leaves an existing credentials array untouched', () => {
+    const withCredential: VaultContentsV1 = {
+      ...contents,
+      credentials: [{ id: '1', domain: 'example.com', username: 'me', password: 'hunter2', updatedAt: 0 }]
+    }
+    const container = createContainer('correct horse', 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF', withCredential)
+    expect(unlockWithPassword(container, 'correct horse').contents).toEqual(withCredential)
+  })
+})
+
 describe('updateContainerContents', () => {
   it('re-encrypts mainBlob under the same vault key, leaving both unlock paths working', () => {
     const container = createContainer('correct horse', 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF', contents)

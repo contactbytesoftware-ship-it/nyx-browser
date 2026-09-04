@@ -28,7 +28,10 @@ export class VaultContentsCorruptError extends Error {
 
 function openContents(mainBlob: Buffer, vaultKey: Buffer): VaultContentsV1 {
   try {
-    return decryptJSON<VaultContentsV1>(mainBlob, vaultKey)
+    const parsed = decryptJSON<VaultContentsV1>(mainBlob, vaultKey)
+    // Vaults written before Phase 2 have no `credentials` key; normalize on read so
+    // every downstream method can rely on the array existing. Persisted on next save.
+    return { ...parsed, credentials: parsed.credentials ?? [] }
   } catch (err) {
     // The caller never receives the key on this path, so zero it here.
     vaultKey.fill(0)
