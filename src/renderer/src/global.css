@@ -20,5 +20,5 @@ body,
 }
 
 body {
-  background: #1a1a1d;
+  background: var(--bg, #1a1a1d);
 }

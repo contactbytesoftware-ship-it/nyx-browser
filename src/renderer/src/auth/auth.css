@@ -5,7 +5,7 @@
   max-width: 360px;
   margin: 10vh auto;
   padding: 24px;
-  color: #e6e6e6;
+  color: var(--text, #e6e6e6);
   font-family: system-ui, sans-serif;
 }
 
@@ -15,16 +15,16 @@
 }
 
 .auth-screen input {
-  background: #1c1c1f;
-  border: 1px solid #333;
-  color: #e6e6e6;
+  background: var(--bg-secondary, #1c1c1f);
+  border: 1px solid var(--border, #333);
+  color: var(--text, #e6e6e6);
   padding: 10px;
   border-radius: 6px;
   font-size: 14px;
 }
 
 .auth-screen button {
-  background: #6c4cf1;
+  background: var(--accent, #6c4cf1);
   color: white;
   border: none;
   padding: 10px;
@@ -52,7 +52,7 @@
 }
 
 .auth-screen code {
-  background: #1c1c1f;
+  background: var(--bg-secondary, #1c1c1f);
   padding: 8px;
   border-radius: 6px;
   word-break: break-all;

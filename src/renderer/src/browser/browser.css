@@ -5,8 +5,8 @@
   /* Set from src/shared/layout.ts in main.tsx; must match the main process's
      CHROME_HEIGHT or the tab WebContentsView stops lining up with the chrome. */
   height: var(--chrome-height, 88px);
-  background: #1a1a1d;
-  color: #e6e6e6;
+  background: var(--bg, #1a1a1d);
+  color: var(--text, #e6e6e6);
   font-family: system-ui, sans-serif;
 }
 
@@ -78,7 +78,7 @@
   gap: 6px;
   height: 48px;
   padding: 0 8px;
-  background: #111113;
+  background: var(--bg-secondary, #111113);
 }
 
 .address-bar button {
@@ -167,7 +167,7 @@
 }
 
 .credential-banner-primary {
-  background: #6c4cf1;
+  background: var(--accent, #6c4cf1);
   color: white;
 }
 
