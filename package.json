@@ -10,7 +10,26 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dist": "electron-vite build && electron-builder --win",
+    "release": "electron-vite build && electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "com.nyxbrowser.app",
+    "productName": "NYX Browser",
+    "win": { "target": "nsis" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "contactbytesoftware-ship-it",
+      "repo": "nyx-browser"
+    }
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -19,6 +38,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "png-to-ico": "^3.0.2",
     "pngjs": "^7.0.0",
