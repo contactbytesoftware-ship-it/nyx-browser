@@ -31,6 +31,30 @@ describe('loadSettings', () => {
     await rm(dir, { recursive: true, force: true })
   })
 
+  it('falls back to defaults when the file declares an unknown future version', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'nyx-settings-'))
+    const path = join(dir, 'settings.json')
+    await writeFile(path, JSON.stringify({ version: 2, theme: 'light', accentColor: '#00ff00' }), 'utf8')
+    expect(await loadSettings(path)).toEqual(DEFAULT_SETTINGS)
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('falls back to defaults when the version field is present but the wrong type', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'nyx-settings-'))
+    const path = join(dir, 'settings.json')
+    await writeFile(path, JSON.stringify({ version: '1', theme: 'light' }), 'utf8')
+    expect(await loadSettings(path)).toEqual(DEFAULT_SETTINGS)
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('falls back to defaults when the file parses to something that is not an object', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'nyx-settings-'))
+    const path = join(dir, 'settings.json')
+    await writeFile(path, '[1, 2, 3]', 'utf8')
+    expect(await loadSettings(path)).toEqual(DEFAULT_SETTINGS)
+    await rm(dir, { recursive: true, force: true })
+  })
+
   it('falls back to defaults when the file contains invalid JSON', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'nyx-settings-'))
     const path = join(dir, 'settings.json')
