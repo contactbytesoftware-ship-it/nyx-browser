@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { VaultApi } from '../shared/vault-types'
 import type { TabInfo, TabsApi } from '../shared/tab-types'
 import type { CredentialsApi } from '../shared/credential-types'
+import type { SettingsApi } from '../shared/settings-types'
 
 const vaultApi: VaultApi = {
   exists: () => ipcRenderer.invoke('vault:exists'),
@@ -28,6 +29,8 @@ const tabsApi: TabsApi = {
   goBack: (id) => ipcRenderer.invoke('tabs:goBack', id),
   goForward: (id) => ipcRenderer.invoke('tabs:goForward', id),
   reload: (id) => ipcRenderer.invoke('tabs:reload', id),
+  hideActive: () => ipcRenderer.invoke('tabs:hideActive'),
+  showActive: () => ipcRenderer.invoke('tabs:showActive'),
   onChanged: (callback) => {
     const listener = (_e: Electron.IpcRendererEvent, tabs: TabInfo[]): void => callback(tabs)
     ipcRenderer.on('tabs:changed', listener)
@@ -57,4 +60,14 @@ const credentialsApi: CredentialsApi = {
   }
 }
 
-contextBridge.exposeInMainWorld('nyx', { vault: vaultApi, tabs: tabsApi, credentials: credentialsApi })
+const settingsApi: SettingsApi = {
+  get: () => ipcRenderer.invoke('settings:get'),
+  update: (settings) => ipcRenderer.invoke('settings:update', settings)
+}
+
+contextBridge.exposeInMainWorld('nyx', {
+  vault: vaultApi,
+  tabs: tabsApi,
+  credentials: credentialsApi,
+  settings: settingsApi
+})

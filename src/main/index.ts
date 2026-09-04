@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, session } from 'electron'
 import { join } from 'node:path'
 import { VaultManager } from './vault/manager'
 import { registerVaultIpc } from './vault/ipc'
@@ -8,6 +8,9 @@ import { registerCredentialsIpc } from './credentials/ipc'
 import { attachCredentialCapture } from './credentials/domActions'
 import { attachLockShortcut, attachFillShortcut } from './shortcuts'
 import { startIdleWatcher, DEFAULT_IDLE_TIMEOUT_SECONDS } from './idle'
+import { SettingsManager } from './settings/manager'
+import { registerSettingsIpc } from './settings/ipc'
+import { attachAdBlock } from './adblock/session'
 
 // Must run before anything reads app.getPath('userData'), which is derived from
 // the app name — so at module scope, not inside app.whenReady().
@@ -40,8 +43,9 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const vault = new VaultManager(join(app.getPath('userData'), 'vault.nyx'))
+  const settings = await SettingsManager.create(join(app.getPath('userData'), 'settings.json'))
   const win = createWindow()
 
   let tabs: TabManager
@@ -78,8 +82,10 @@ app.whenReady().then(() => {
   registerVaultIpc(vault, lock, unlock)
   registerTabsIpc(win, tabs)
   registerCredentialsIpc(vault, tabs)
+  registerSettingsIpc(settings)
   attachLockShortcut(win.webContents, lock)
   attachFillShortcut(win.webContents, requestFill)
+  attachAdBlock(session.defaultSession, () => settings.get().adBlockEnabled)
 
   const stopIdleWatcher = startIdleWatcher(DEFAULT_IDLE_TIMEOUT_SECONDS, lock)
   win.on('closed', stopIdleWatcher)

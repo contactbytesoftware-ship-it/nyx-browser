@@ -21,3 +21,8 @@ export const DEFAULT_SETTINGS: SettingsV1 = {
   defaultSearchEngineId: 'brave',
   adBlockEnabled: true
 }
+
+export interface SettingsApi {
+  get(): Promise<SettingsV1>
+  update(settings: SettingsV1): Promise<void>
+}

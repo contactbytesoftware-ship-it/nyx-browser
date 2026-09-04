@@ -17,5 +17,7 @@ export interface TabsApi {
   goBack(id: number): Promise<void>
   goForward(id: number): Promise<void>
   reload(id: number): Promise<void>
+  hideActive(): Promise<void>
+  showActive(): Promise<void>
   onChanged(callback: (tabs: TabInfo[]) => void): () => void
 }

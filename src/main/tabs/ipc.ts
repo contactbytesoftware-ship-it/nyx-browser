@@ -12,4 +12,6 @@ export function registerTabsIpc(win: BrowserWindow, tabs: TabManager): void {
   ipcMain.handle('tabs:goBack', (_e, id: number) => tabs.goBack(id))
   ipcMain.handle('tabs:goForward', (_e, id: number) => tabs.goForward(id))
   ipcMain.handle('tabs:reload', (_e, id: number) => tabs.reload(id))
+  ipcMain.handle('tabs:hideActive', () => tabs.hideActive())
+  ipcMain.handle('tabs:showActive', () => tabs.showActive())
 }
