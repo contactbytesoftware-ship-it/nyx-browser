@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { TabInfo } from '../../../shared/tab-types'
 import type { CredentialV1 } from '../../../shared/credential-types'
 import type { SettingsV1 } from '../../../shared/settings-types'
+import { DEFAULT_SETTINGS } from '../../../shared/settings-types'
 import TabStrip from './TabStrip'
 import AddressBar from './AddressBar'
 import CredentialBanner from '../credentials/CredentialBanner'
@@ -12,7 +13,10 @@ import { GENERIC_ERROR } from '../errors'
 import './browser.css'
 
 const ERROR_DISMISS_MS = 5000
-const DEFAULT_SEARCH_TEMPLATE = 'https://search.brave.com/search?q=%s'
+// Derived, not re-typed: the shipped default engine lives in DEFAULT_SETTINGS, and
+// a second literal here would silently diverge from it.
+const DEFAULT_SEARCH_TEMPLATE = DEFAULT_SETTINGS.searchEngines[0].urlTemplate
+const DEFAULT_HOMEPAGE = new URL(DEFAULT_SEARCH_TEMPLATE).origin
 
 interface SubmissionCapture {
   domain: string
@@ -24,6 +28,21 @@ function defaultSearchUrlTemplate(current: SettingsV1 | null): string {
   if (!current) return DEFAULT_SEARCH_TEMPLATE
   const engine = current.searchEngines.find((e) => e.id === current.defaultSearchEngineId)
   return engine?.urlTemplate ?? DEFAULT_SEARCH_TEMPLATE
+}
+
+/**
+ * Where a new tab opens. There is no separate homepage setting, so the default
+ * search engine's own origin stands in for one — otherwise picking DuckDuckGo
+ * still landed every new tab on Brave.
+ */
+function defaultHomepage(current: SettingsV1 | null): string {
+  const template = defaultSearchUrlTemplate(current)
+  try {
+    return new URL(template).origin
+  } catch {
+    // A user-added engine's template is free text and need not be a valid URL.
+    return DEFAULT_HOMEPAGE
+  }
 }
 
 export default function BrowserChrome(): JSX.Element {
@@ -61,7 +80,10 @@ export default function BrowserChrome(): JSX.Element {
         const existing = await window.nyx.tabs.list()
         if (cancelled) return
         if (existing.length === 0) {
-          await window.nyx.tabs.create('https://search.brave.com')
+          // Mount-time `settings` may still be null here (its fetch is a separate
+          // effect); defaultHomepage falls back to the shipped engine in that case,
+          // which is exactly the URL this used to hardcode.
+          await window.nyx.tabs.create(defaultHomepage(settings))
         } else {
           setTabs(existing)
         }
@@ -136,67 +158,80 @@ export default function BrowserChrome(): JSX.Element {
     run(() => window.nyx.settings.update(next))
   }
 
-  if (showSettings && settings) {
-    return <SettingsPanel settings={settings} onChange={handleSettingsChange} onClose={closeSettings} />
-  }
+  // `settings` can still be null for the first frames after mount, so "the panel is
+  // showing" means the flag AND a loaded settings object.
+  const settingsOpen = showSettings && settings !== null
 
   return (
-    <div className="browser-chrome">
-      <TabStrip
-        tabs={tabs}
-        onActivate={(id) => run(() => window.nyx.tabs.activate(id))}
-        onClose={(id) => run(() => window.nyx.tabs.close(id))}
-        onNewTab={() => run(() => window.nyx.tabs.create('https://search.brave.com'))}
-        onLock={() => run(() => window.nyx.vault.lock())}
-        onOpenSettings={openSettings}
-      />
-      <AddressBar
-        tab={activeTab}
-        onRun={run}
-        hasCredential={activeCredential !== null}
-        onFillRequest={() => setFillConfirmPending(true)}
-        searchUrlTemplate={defaultSearchUrlTemplate(settings)}
-      />
-      {fillConfirmPending && activeCredential && (
-        <CredentialBanner
-          message={`Fill saved login for ${activeCredential.domain}?`}
-          actions={[
-            {
-              label: 'Fill',
-              primary: true,
-              onClick: () => {
-                setFillConfirmPending(false)
-                run(() => window.nyx.credentials.fill(activeCredential.domain))
-              }
-            },
-            { label: 'Cancel', onClick: () => setFillConfirmPending(false) }
-          ]}
-        />
+    <div className={`chrome-root${settingsOpen ? ' chrome-root-settings' : ''}`}>
+      {settingsOpen && settings ? (
+        <SettingsPanel settings={settings} onChange={handleSettingsChange} onClose={closeSettings} />
+      ) : (
+        <div className="browser-chrome">
+          <TabStrip
+            tabs={tabs}
+            onActivate={(id) => run(() => window.nyx.tabs.activate(id))}
+            onClose={(id) => run(() => window.nyx.tabs.close(id))}
+            onNewTab={() => run(() => window.nyx.tabs.create(defaultHomepage(settings)))}
+            onLock={() => run(() => window.nyx.vault.lock())}
+            onOpenSettings={openSettings}
+          />
+          <AddressBar
+            tab={activeTab}
+            onRun={run}
+            hasCredential={activeCredential !== null}
+            onFillRequest={() => setFillConfirmPending(true)}
+            searchUrlTemplate={defaultSearchUrlTemplate(settings)}
+          />
+          {fillConfirmPending && activeCredential && (
+            <CredentialBanner
+              message={`Fill saved login for ${activeCredential.domain}?`}
+              actions={[
+                {
+                  label: 'Fill',
+                  primary: true,
+                  onClick: () => {
+                    setFillConfirmPending(false)
+                    run(() => window.nyx.credentials.fill(activeCredential.domain))
+                  }
+                },
+                { label: 'Cancel', onClick: () => setFillConfirmPending(false) }
+              ]}
+            />
+          )}
+          {!fillConfirmPending && saveCapture && (
+            <CredentialBanner
+              message={`Save password for ${saveCapture.domain}?`}
+              actions={[
+                {
+                  label: 'Save',
+                  primary: true,
+                  onClick: () => {
+                    const capture = saveCapture
+                    setSaveCapture(null)
+                    run(async () => {
+                      const credential = await window.nyx.credentials.save(
+                        capture.domain,
+                        capture.username,
+                        capture.password
+                      )
+                      // The domain-lookup effect only re-runs on a URL change, so adopt
+                      // the saved credential directly here — otherwise the Fill button
+                      // would not appear until the user navigated away and back.
+                      setActiveCredential(credential)
+                    })
+                  }
+                },
+                { label: 'Not now', onClick: () => setSaveCapture(null) }
+              ]}
+            />
+          )}
+        </div>
       )}
-      {!fillConfirmPending && saveCapture && (
-        <CredentialBanner
-          message={`Save password for ${saveCapture.domain}?`}
-          actions={[
-            {
-              label: 'Save',
-              primary: true,
-              onClick: () => {
-                const capture = saveCapture
-                setSaveCapture(null)
-                run(async () => {
-                  const credential = await window.nyx.credentials.save(
-                    capture.domain,
-                    capture.username,
-                    capture.password
-                  )
-                  setActiveCredential(credential)
-                })
-              }
-            },
-            { label: 'Not now', onClick: () => setSaveCapture(null) }
-          ]}
-        />
-      )}
+      {/* Outside both branches on purpose: a rejected settings:update (disk full,
+          permissions) sets `error` while the Settings panel is showing, and inside
+          the chrome branch nothing ever rendered it — the panel showed the change
+          as applied even though it never reached disk. */}
       {error && <p className="chrome-error">{error}</p>}
     </div>
   )
