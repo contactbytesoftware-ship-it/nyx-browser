@@ -1,24 +1,45 @@
 import { useEffect, useState } from 'react'
 import type { TabInfo } from '../../../shared/tab-types'
 import { resolveAddressBarInput } from './resolveAddressBarInput'
+import { generatePassword } from '../credentials/generatePassword'
 
 interface AddressBarProps {
   tab: TabInfo | null
   /** Runs an IPC call, surfacing a rejection instead of leaving it unhandled. */
   onRun: (action: () => Promise<unknown>) => void
+  hasCredential: boolean
+  onFillRequest: () => void
 }
 
-export default function AddressBar({ tab, onRun }: AddressBarProps): JSX.Element {
+const COPIED_RESET_MS = 2000
+
+export default function AddressBar({ tab, onRun, hasCredential, onFillRequest }: AddressBarProps): JSX.Element {
   const [input, setInput] = useState('')
+  const [justGenerated, setJustGenerated] = useState(false)
 
   useEffect(() => {
     if (tab) setInput(tab.url)
   }, [tab?.id, tab?.url])
 
+  useEffect(() => {
+    if (!justGenerated) return undefined
+    const timer = setTimeout(() => setJustGenerated(false), COPIED_RESET_MS)
+    return () => clearTimeout(timer)
+  }, [justGenerated])
+
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault()
     if (!tab) return
     onRun(() => window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input)))
+  }
+
+  async function handleGenerate(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(generatePassword())
+      setJustGenerated(true)
+    } catch {
+      // Clipboard access can fail in unusual environments; nothing to recover here.
+    }
   }
 
   return (
@@ -42,6 +63,14 @@ export default function AddressBar({ tab, onRun }: AddressBarProps): JSX.Element
         onChange={(e) => setInput(e.target.value)}
         placeholder="Search Brave or enter address"
       />
+      {hasCredential && (
+        <button type="button" className="address-fill" onClick={onFillRequest}>
+          Fill
+        </button>
+      )}
+      <button type="button" className="address-generate" onClick={handleGenerate}>
+        {justGenerated ? 'Copied' : 'Generate'}
+      </button>
     </form>
   )
 }

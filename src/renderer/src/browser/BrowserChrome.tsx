@@ -1,15 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { TabInfo } from '../../../shared/tab-types'
+import type { CredentialV1 } from '../../../shared/credential-types'
 import TabStrip from './TabStrip'
 import AddressBar from './AddressBar'
+import CredentialBanner from '../credentials/CredentialBanner'
+import { extractHostname } from '../credentials/extractHostname'
 import { GENERIC_ERROR } from '../errors'
 import './browser.css'
 
 const ERROR_DISMISS_MS = 5000
 
+interface SubmissionCapture {
+  domain: string
+  username: string
+  password: string
+}
+
 export default function BrowserChrome(): JSX.Element {
   const [tabs, setTabs] = useState<TabInfo[]>([])
   const [error, setError] = useState('')
+  const [activeCredential, setActiveCredential] = useState<CredentialV1 | null>(null)
+  const [fillConfirmPending, setFillConfirmPending] = useState(false)
+  const [saveCapture, setSaveCapture] = useState<SubmissionCapture | null>(null)
 
   /**
    * Runs a fire-and-forget IPC call. Without this, a main-process throw becomes an
@@ -54,6 +66,36 @@ export default function BrowserChrome(): JSX.Element {
 
   const activeTab = tabs.find((t) => t.isActive) ?? null
 
+  useEffect(() => {
+    const domain = activeTab ? extractHostname(activeTab.url) : null
+    if (!domain) {
+      setActiveCredential(null)
+      return undefined
+    }
+    let cancelled = false
+    window.nyx.credentials
+      .getForDomain(domain)
+      .then((credential) => {
+        if (!cancelled) setActiveCredential(credential)
+      })
+      .catch(() => {
+        if (!cancelled) setActiveCredential(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab?.url])
+
+  useEffect(() => window.nyx.credentials.onSubmissionDetected((capture) => setSaveCapture(capture)), [])
+
+  useEffect(
+    () =>
+      window.nyx.credentials.onFillRequested(() => {
+        setFillConfirmPending((pending) => pending || activeCredential !== null)
+      }),
+    [activeCredential]
+  )
+
   return (
     <div className="browser-chrome">
       <TabStrip
@@ -63,7 +105,45 @@ export default function BrowserChrome(): JSX.Element {
         onNewTab={() => run(() => window.nyx.tabs.create('https://search.brave.com'))}
         onLock={() => run(() => window.nyx.vault.lock())}
       />
-      <AddressBar tab={activeTab} onRun={run} />
+      <AddressBar
+        tab={activeTab}
+        onRun={run}
+        hasCredential={activeCredential !== null}
+        onFillRequest={() => setFillConfirmPending(true)}
+      />
+      {fillConfirmPending && activeCredential && (
+        <CredentialBanner
+          message={`Fill saved login for ${activeCredential.domain}?`}
+          actions={[
+            {
+              label: 'Fill',
+              primary: true,
+              onClick: () => {
+                setFillConfirmPending(false)
+                run(() => window.nyx.credentials.fill(activeCredential.domain))
+              }
+            },
+            { label: 'Cancel', onClick: () => setFillConfirmPending(false) }
+          ]}
+        />
+      )}
+      {!fillConfirmPending && saveCapture && (
+        <CredentialBanner
+          message={`Save password for ${saveCapture.domain}?`}
+          actions={[
+            {
+              label: 'Save',
+              primary: true,
+              onClick: () => {
+                const capture = saveCapture
+                setSaveCapture(null)
+                run(() => window.nyx.credentials.save(capture.domain, capture.username, capture.password))
+              }
+            },
+            { label: 'Not now', onClick: () => setSaveCapture(null) }
+          ]}
+        />
+      )}
       {error && <p className="chrome-error">{error}</p>}
     </div>
   )
