@@ -53,6 +53,7 @@ export default function BrowserChrome(): JSX.Element {
   const [saveCapture, setSaveCapture] = useState<SubmissionCapture | null>(null)
   const [settings, setSettings] = useState<SettingsV1 | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [updateReady, setUpdateReady] = useState<string | null>(null)
 
   /**
    * Runs a fire-and-forget IPC call. Without this, a main-process throw becomes an
@@ -141,6 +142,8 @@ export default function BrowserChrome(): JSX.Element {
   useEffect(() => {
     if (activeCredential === null) setFillConfirmPending(false)
   }, [activeCredential])
+
+  useEffect(() => window.nyx.updater.onUpdateReady((version) => setUpdateReady(version)), [])
 
   function openSettings(): void {
     run(() => window.nyx.tabs.hideActive())
@@ -231,8 +234,28 @@ export default function BrowserChrome(): JSX.Element {
       {/* Outside both branches on purpose: a rejected settings:update (disk full,
           permissions) sets `error` while the Settings panel is showing, and inside
           the chrome branch nothing ever rendered it — the panel showed the change
-          as applied even though it never reached disk. */}
+          as applied even though it never reached disk. Same reasoning applies to
+          the update banner below. */}
       {error && <p className="chrome-error">{error}</p>}
+      {/* Gated on the credential banners being absent: .credential-banner is an
+          absolutely-positioned full-width bar, so an update banner and a fill/save
+          prompt would render exactly on top of each other if both were shown at
+          once. The credential prompt is time-sensitive (tied to what the user just
+          did); updateReady simply stays true and reappears on the next render once
+          neither prompt is pending. */}
+      {updateReady && !fillConfirmPending && !saveCapture && (
+        <CredentialBanner
+          message={`Update ready (v${updateReady}) — restart to install`}
+          actions={[
+            {
+              label: 'Restart Now',
+              primary: true,
+              onClick: () => window.nyx.updater.restartNow()
+            },
+            { label: 'Later', onClick: () => setUpdateReady(null) }
+          ]}
+        />
+      )}
     </div>
   )
 }

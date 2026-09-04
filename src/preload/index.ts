@@ -3,6 +3,7 @@ import type { VaultApi } from '../shared/vault-types'
 import type { TabInfo, TabsApi } from '../shared/tab-types'
 import type { CredentialsApi } from '../shared/credential-types'
 import type { SettingsApi } from '../shared/settings-types'
+import type { UpdaterApi } from '../shared/updater-types'
 
 const vaultApi: VaultApi = {
   exists: () => ipcRenderer.invoke('vault:exists'),
@@ -65,9 +66,19 @@ const settingsApi: SettingsApi = {
   update: (settings) => ipcRenderer.invoke('settings:update', settings)
 }
 
+const updaterApi: UpdaterApi = {
+  onUpdateReady: (callback) => {
+    const listener = (_e: Electron.IpcRendererEvent, version: string): void => callback(version)
+    ipcRenderer.on('updater:ready', listener)
+    return () => ipcRenderer.removeListener('updater:ready', listener)
+  },
+  restartNow: () => ipcRenderer.invoke('updater:restartNow')
+}
+
 contextBridge.exposeInMainWorld('nyx', {
   vault: vaultApi,
   tabs: tabsApi,
   credentials: credentialsApi,
-  settings: settingsApi
+  settings: settingsApi,
+  updater: updaterApi
 })
