@@ -114,6 +114,11 @@ export class TabManager extends EventEmitter {
     })
   }
 
+  getActiveWebContents(): Electron.WebContents | null {
+    if (this.activeId === null) return null
+    return this.views.get(this.activeId)?.webContents ?? null
+  }
+
   hideActive(): void {
     if (this.activeId === null) return
     const view = this.views.get(this.activeId)
