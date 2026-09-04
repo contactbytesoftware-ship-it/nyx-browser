@@ -30,7 +30,9 @@ export default function AddressBar({ tab, onRun, hasCredential, onFillRequest }:
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault()
     if (!tab) return
-    onRun(() => window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input)))
+    // TODO(Task 6): replace this hardcoded template with the user's configured
+    // default search engine once the Settings screen exists.
+    onRun(() => window.nyx.tabs.navigate(tab.id, resolveAddressBarInput(input, 'https://search.brave.com/search?q=%s')))
   }
 
   async function handleGenerate(): Promise<void> {
