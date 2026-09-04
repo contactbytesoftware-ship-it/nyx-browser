@@ -5,6 +5,7 @@ import {
   unlockWithRecoveryKey as containerUnlockWithRecoveryKey,
   serializeContainer,
   parseContainer,
+  updateContainerContents,
   VaultContentsCorruptError,
   VAULT_VERSION,
   VaultContainer,
@@ -12,6 +13,8 @@ import {
 } from './container'
 import { generateTotpSecret, totpProvisioningUri, verifyTotpCode } from './totp'
 import { generateRecoveryKey } from './recovery'
+import { randomUUID } from 'node:crypto'
+import type { CredentialV1 } from '../../shared/credential-types'
 import type { RecoveryUnlockResult, SetupResult, UnlockResult } from '../../shared/vault-types'
 
 // Result shapes live in src/shared/vault-types.ts so the preload and renderer
@@ -31,6 +34,7 @@ class VaultFileCorruptError extends Error {
 export class VaultManager {
   private container: VaultContainer | null = null
   private vaultKey: Buffer | null = null
+  private contents: VaultContentsV1 | null = null
   private failedAttempts = 0
   private lockedUntil = 0
 
@@ -47,7 +51,7 @@ export class VaultManager {
   async setup(password: string): Promise<SetupResult> {
     const totpSecret = generateTotpSecret()
     const recoveryKey = generateRecoveryKey()
-    const contents: VaultContentsV1 = { version: VAULT_VERSION, totpSecret, settings: {} }
+    const contents: VaultContentsV1 = { version: VAULT_VERSION, totpSecret, settings: {}, credentials: [] }
     const container = createContainer(password, recoveryKey, contents)
     await saveRawFile(this.vaultPath, serializeContainer(container))
     this.container = container
@@ -124,6 +128,7 @@ export class VaultManager {
       return { ok: false, reason: 'wrong-totp' }
     }
     this.vaultKey = unlocked.vaultKey
+    this.contents = unlocked.contents
     this.registerSuccess()
     return { ok: true }
   }
@@ -171,11 +176,59 @@ export class VaultManager {
 
     this.container = rekeyed
     this.vaultKey = newVaultKey
+    this.contents = unlocked.contents
     return { ok: true, recoveryKey: newRecoveryKey }
   }
 
   lock(): void {
     this.vaultKey?.fill(0)
     this.vaultKey = null
+    this.contents = null
+  }
+
+  private async persistContents(): Promise<void> {
+    if (!this.container || !this.vaultKey || !this.contents) {
+      throw new Error('cannot persist credentials while the vault is locked')
+    }
+    const updated = updateContainerContents(this.container, this.vaultKey, this.contents)
+    await saveRawFile(this.vaultPath, serializeContainer(updated))
+    this.container = updated
+  }
+
+  listCredentials(): CredentialV1[] {
+    if (!this.contents) throw new Error('cannot list credentials while the vault is locked')
+    return [...this.contents.credentials]
+  }
+
+  getCredentialForDomain(domain: string): CredentialV1 | null {
+    if (!this.contents) throw new Error('cannot read credentials while the vault is locked')
+    return this.contents.credentials.find((c) => c.domain === domain) ?? null
+  }
+
+  async saveCredential(domain: string, username: string, password: string, notes?: string): Promise<CredentialV1> {
+    if (!this.contents) throw new Error('cannot save a credential while the vault is locked')
+    const existing = this.contents.credentials.find((c) => c.domain === domain)
+    const credential: CredentialV1 = {
+      id: existing?.id ?? randomUUID(),
+      domain,
+      username,
+      password,
+      notes,
+      updatedAt: Date.now()
+    }
+    this.contents = {
+      ...this.contents,
+      credentials: existing
+        ? this.contents.credentials.map((c) => (c.domain === domain ? credential : c))
+        : [...this.contents.credentials, credential]
+    }
+    await this.persistContents()
+    return credential
+  }
+
+  async deleteCredential(id: string): Promise<void> {
+    if (!this.contents) throw new Error('cannot delete a credential while the vault is locked')
+    this.contents = { ...this.contents, credentials: this.contents.credentials.filter((c) => c.id !== id) }
+    await this.persistContents()
   }
 }

@@ -195,3 +195,78 @@ describe('corrupt and unsupported vaults', () => {
     expect(manager.isUnlocked).toBe(false)
   }, SLOW)
 })
+
+describe('credentials', () => {
+  async function unlockedManager(): Promise<VaultManager> {
+    const manager = new VaultManager(vaultPath)
+    const { totpProvisioningUri } = await manager.setup('correct horse battery staple')
+    const secret = new URL(totpProvisioningUri).searchParams.get('secret')!
+    await manager.unlockWithPassword('correct horse battery staple', codeFor(secret))
+    return manager
+  }
+
+  it('starts with an empty credential list', async () => {
+    const manager = await unlockedManager()
+    expect(manager.listCredentials()).toEqual([])
+    expect(manager.getCredentialForDomain('example.com')).toBeNull()
+  })
+
+  it('saves a credential and returns it', async () => {
+    const manager = await unlockedManager()
+    const saved = await manager.saveCredential('example.com', 'me', 'hunter2')
+    expect(saved.domain).toBe('example.com')
+    expect(saved.username).toBe('me')
+    expect(saved.password).toBe('hunter2')
+    expect(saved.id).toBeTruthy()
+    expect(manager.listCredentials()).toEqual([saved])
+    expect(manager.getCredentialForDomain('example.com')).toEqual(saved)
+  })
+
+  it('overwrites the existing entry when saving again for the same domain', async () => {
+    const manager = await unlockedManager()
+    const first = await manager.saveCredential('example.com', 'me', 'oldpass')
+    const second = await manager.saveCredential('example.com', 'me', 'newpass')
+    expect(second.id).toBe(first.id)
+    expect(manager.listCredentials()).toHaveLength(1)
+    expect(manager.getCredentialForDomain('example.com')?.password).toBe('newpass')
+  })
+
+  it('deletes a credential', async () => {
+    const manager = await unlockedManager()
+    const saved = await manager.saveCredential('example.com', 'me', 'hunter2')
+    await manager.deleteCredential(saved.id)
+    expect(manager.listCredentials()).toEqual([])
+    expect(manager.getCredentialForDomain('example.com')).toBeNull()
+  })
+
+  it('deleting an unknown id is a no-op', async () => {
+    const manager = await unlockedManager()
+    await manager.saveCredential('example.com', 'me', 'hunter2')
+    await manager.deleteCredential('does-not-exist')
+    expect(manager.listCredentials()).toHaveLength(1)
+  })
+
+  it(
+    'persists credentials across a reopen (re-unlock) of the vault',
+    async () => {
+      const manager = new VaultManager(vaultPath)
+      const { totpProvisioningUri } = await manager.setup('correct horse battery staple')
+      const secret = new URL(totpProvisioningUri).searchParams.get('secret')!
+      await manager.unlockWithPassword('correct horse battery staple', codeFor(secret))
+      await manager.saveCredential('example.com', 'me', 'hunter2')
+      manager.lock()
+
+      const reopened = new VaultManager(vaultPath)
+      await reopened.unlockWithPassword('correct horse battery staple', codeFor(secret))
+      expect(reopened.getCredentialForDomain('example.com')?.password).toBe('hunter2')
+    },
+    SLOW
+  )
+
+  it('throws when reading or writing credentials while locked', async () => {
+    const manager = new VaultManager(vaultPath)
+    await manager.setup('correct horse battery staple')
+    expect(() => manager.listCredentials()).toThrow()
+    await expect(manager.saveCredential('example.com', 'me', 'hunter2')).rejects.toThrow()
+  })
+})
