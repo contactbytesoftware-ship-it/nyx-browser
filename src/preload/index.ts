@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { VaultApi } from '../shared/vault-types'
 import type { TabInfo, TabsApi } from '../shared/tab-types'
+import type { CredentialsApi } from '../shared/credential-types'
 
 const vaultApi: VaultApi = {
   exists: () => ipcRenderer.invoke('vault:exists'),
@@ -34,4 +35,26 @@ const tabsApi: TabsApi = {
   }
 }
 
-contextBridge.exposeInMainWorld('nyx', { vault: vaultApi, tabs: tabsApi })
+const credentialsApi: CredentialsApi = {
+  list: () => ipcRenderer.invoke('credentials:list'),
+  getForDomain: (domain) => ipcRenderer.invoke('credentials:getForDomain', domain),
+  save: (domain, username, password, notes) =>
+    ipcRenderer.invoke('credentials:save', domain, username, password, notes),
+  delete: (id) => ipcRenderer.invoke('credentials:delete', id),
+  fill: (domain) => ipcRenderer.invoke('credentials:fill', domain),
+  onSubmissionDetected: (callback) => {
+    const listener = (
+      _e: Electron.IpcRendererEvent,
+      capture: { domain: string; username: string; password: string }
+    ): void => callback(capture)
+    ipcRenderer.on('credentials:submissionDetected', listener)
+    return () => ipcRenderer.removeListener('credentials:submissionDetected', listener)
+  },
+  onFillRequested: (callback) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('credentials:fillRequested', listener)
+    return () => ipcRenderer.removeListener('credentials:fillRequested', listener)
+  }
+}
+
+contextBridge.exposeInMainWorld('nyx', { vault: vaultApi, tabs: tabsApi, credentials: credentialsApi })

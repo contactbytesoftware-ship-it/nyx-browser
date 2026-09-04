@@ -12,3 +12,16 @@ export function attachLockShortcut(webContents: WebContents, onLock: () => void)
     }
   })
 }
+
+export function isFillShortcut(input: Input): boolean {
+  return input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'f'
+}
+
+export function attachFillShortcut(webContents: WebContents, onFillRequested: () => void): void {
+  webContents.on('before-input-event', (event, input) => {
+    if (isFillShortcut(input)) {
+      event.preventDefault()
+      onFillRequested()
+    }
+  })
+}

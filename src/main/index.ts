@@ -4,7 +4,9 @@ import { VaultManager } from './vault/manager'
 import { registerVaultIpc } from './vault/ipc'
 import { TabManager } from './tabs/manager'
 import { registerTabsIpc } from './tabs/ipc'
-import { attachLockShortcut } from './shortcuts'
+import { registerCredentialsIpc } from './credentials/ipc'
+import { attachCredentialCapture } from './credentials/domActions'
+import { attachLockShortcut, attachFillShortcut } from './shortcuts'
 import { startIdleWatcher, DEFAULT_IDLE_TIMEOUT_SECONDS } from './idle'
 
 // Must run before anything reads app.getPath('userData'), which is derived from
@@ -52,11 +54,20 @@ app.whenReady().then(() => {
   const unlock = (): void => {
     tabs.showActive()
   }
+  const requestFill = (): void => {
+    win.webContents.send('credentials:fillRequested')
+  }
 
-  tabs = new TabManager(win, (wc) => attachLockShortcut(wc, lock))
+  tabs = new TabManager(win, (wc) => {
+    attachLockShortcut(wc, lock)
+    attachFillShortcut(wc, requestFill)
+    attachCredentialCapture(wc, (capture) => win.webContents.send('credentials:submissionDetected', capture))
+  })
   registerVaultIpc(vault, lock, unlock)
   registerTabsIpc(win, tabs)
+  registerCredentialsIpc(vault, tabs)
   attachLockShortcut(win.webContents, lock)
+  attachFillShortcut(win.webContents, requestFill)
 
   const stopIdleWatcher = startIdleWatcher(DEFAULT_IDLE_TIMEOUT_SECONDS, lock)
   win.on('closed', stopIdleWatcher)
