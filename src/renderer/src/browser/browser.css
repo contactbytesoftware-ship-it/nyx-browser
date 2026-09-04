@@ -1,3 +1,20 @@
+/* Wraps whichever of the two BrowserChrome branches is showing (normal chrome or
+   the Settings panel) so .chrome-error can render outside both and still have a
+   positioning context. In the normal branch it is exactly the chrome band, so
+   .chrome-error's `bottom` lands where it always did — inside --chrome-height,
+   above the tab WebContentsView. */
+.chrome-root {
+  position: relative;
+  height: var(--chrome-height, 88px);
+}
+
+/* With Settings open the active tab's view is detached (tabs.hideActive), so the
+   wrapper takes the whole window and .settings-panel's `height: 100%` resolves
+   against it exactly as it used to resolve against #root. */
+.chrome-root-settings {
+  height: 100%;
+}
+
 .browser-chrome {
   position: relative;
   display: flex;
@@ -26,14 +43,14 @@
   padding: 0 10px;
   height: 30px;
   border-radius: 6px;
-  background: #26262b;
+  background: var(--surface, #26262b);
   max-width: 200px;
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
 
 .tab-active {
-  background: #34343c;
+  background: var(--surface-active, #34343c);
 }
 
 .tab-title {
@@ -61,19 +78,9 @@
   font-size: 16px;
 }
 
-.tab-lock {
-  background: #26262b;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  -webkit-app-region: no-drag;
-}
-
+.tab-lock,
 .tab-settings {
-  background: #26262b;
+  background: var(--surface, #26262b);
   border: none;
   color: inherit;
   cursor: pointer;
@@ -93,7 +100,7 @@
 }
 
 .address-bar button {
-  background: #26262b;
+  background: var(--surface, #26262b);
   border: none;
   color: inherit;
   width: 28px;
@@ -107,8 +114,11 @@
   cursor: default;
 }
 
-/* Overlays the right end of the address bar. Must stay inside the chrome's fixed
-   --chrome-height band: anything below it is covered by the tab WebContentsView. */
+/* Overlays the right end of the address bar. Positioned against .chrome-root, so
+   in the normal branch it must stay inside the chrome's fixed --chrome-height
+   band: anything below it is covered by the tab WebContentsView. With Settings
+   open .chrome-root is full-height and no view covers it, so the same rule puts
+   it at the bottom-right of the panel. */
 .chrome-error {
   position: absolute;
   right: 12px;
@@ -128,9 +138,12 @@
 
 .address-input {
   flex: 1;
-  background: #26262b;
-  border: 1px solid #333;
-  color: #e6e6e6;
+  background: var(--surface, #26262b);
+  border: 1px solid var(--border, #333);
+  /* Unlike its siblings this input does not inherit the chrome's color, so it
+     needs --text explicitly or light mode leaves near-white text on a light
+     surface — the single least readable spot in the whole window. */
+  color: var(--text, #e6e6e6);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 13px;
@@ -155,8 +168,10 @@
   gap: 8px;
   padding: 4px 8px;
   border-radius: 6px;
-  background: #1c1c1f;
-  border: 1px solid #333;
+  /* Points at the same --surface as the tabs and toolbar buttons so the banner
+     flips with them, but keeps its own slightly-darker hex as the fallback. */
+  background: var(--surface, #1c1c1f);
+  border: 1px solid var(--border, #333);
   font-size: 12px;
   z-index: 1;
 }
@@ -183,6 +198,6 @@
 }
 
 .credential-banner-secondary {
-  background: #26262b;
+  background: var(--surface, #26262b);
   color: inherit;
 }
