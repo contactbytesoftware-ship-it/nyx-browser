@@ -78,7 +78,11 @@ export default function BrowserChrome(): JSX.Element {
       .then((credential) => {
         if (!cancelled) setActiveCredential(credential)
       })
-      .catch(() => {
+      .catch((err) => {
+        // "No saved login" is a resolved null, not a rejection — a rejection here
+        // means the IPC call itself failed (e.g. the vault locked mid-lookup), so
+        // make it visible in DevTools instead of silently indistinguishable.
+        console.warn('Failed to look up saved credential for domain:', err)
         if (!cancelled) setActiveCredential(null)
       })
     return () => {
@@ -141,7 +145,17 @@ export default function BrowserChrome(): JSX.Element {
               onClick: () => {
                 const capture = saveCapture
                 setSaveCapture(null)
-                run(() => window.nyx.credentials.save(capture.domain, capture.username, capture.password))
+                // The domain-lookup effect only re-runs on a URL change, so adopt
+                // the saved credential directly — otherwise the Fill button would
+                // not appear until the user navigated away and back.
+                run(async () => {
+                  const credential = await window.nyx.credentials.save(
+                    capture.domain,
+                    capture.username,
+                    capture.password
+                  )
+                  setActiveCredential(credential)
+                })
               }
             },
             { label: 'Not now', onClick: () => setSaveCapture(null) }
