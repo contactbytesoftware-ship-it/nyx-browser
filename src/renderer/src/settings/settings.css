@@ -13,6 +13,11 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
+  /* Same job as .tab-strip's `padding: 0 140px 0 8px` in browser.css: the native
+     window caption buttons overlay the top-right ~140x40 of the window, and this
+     header sits inside that band — without the reserve, "Done" renders underneath
+     them and cannot be clicked. */
+  padding-right: 140px;
 }
 
 .settings-header h1 {
@@ -74,11 +79,18 @@
 
 .settings-choice-active {
   background: var(--accent, #6c4cf1) !important;
-  color: white;
+  /* Also !important: without it `.settings-row button`'s `color: var(--text)` wins
+     on specificity, and in light mode the selected Dark/Light button rendered
+     near-black text on the accent fill. */
+  color: white !important;
   border-color: var(--accent, #6c4cf1) !important;
 }
 
-.settings-swatch {
+/* Scoped through .settings-row so these outrank `.settings-row button` above —
+   as bare single-class selectors they lost to it, and the swatches inherited that
+   rule's padding (so they were not circles) and its border (so the "selected"
+   ring never appeared). */
+.settings-row .settings-swatch {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -87,7 +99,7 @@
   padding: 0;
 }
 
-.settings-swatch-active {
+.settings-row .settings-swatch-active {
   border-color: var(--text, #e6e6e6);
 }
 
