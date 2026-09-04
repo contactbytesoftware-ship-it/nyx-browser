@@ -32,7 +32,7 @@ vi.mock('electron-updater', () => ({
     get autoDownload() {
       return mocks.autoDownloadValue
     },
-    set autoDownload(value: boolean) {
+    set autoDownload(value: boolean | undefined) {
       mocks.autoDownloadValue = value
     }
   }
