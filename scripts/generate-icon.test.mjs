@@ -1,23 +1,27 @@
 import { describe, it, expect } from 'vitest'
 import { PNG } from 'pngjs'
-import { drawMonogramPng } from './generate-icon.mjs'
+import { buildIconPng } from './generate-icon.mjs'
 
-describe('drawMonogramPng', () => {
-  it('produces a valid PNG buffer', () => {
-    const buffer = drawMonogramPng(256)
+describe('buildIconPng', () => {
+  it('produces a valid, correctly-sized PNG buffer', async () => {
+    const buffer = await buildIconPng()
     expect(buffer.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    const png = PNG.sync.read(buffer)
+    expect(png.width).toBe(256)
+    expect(png.height).toBe(256)
   })
 
-  it('paints the corners with the background color and the center with the accent color', () => {
-    const buffer = drawMonogramPng(256)
+  it('centers real mark content inside the padded square, not just a blank canvas', async () => {
+    const buffer = await buildIconPng()
     const png = PNG.sync.read(buffer)
-    const pixelAt = (x, y) => {
-      const idx = (png.width * y + x) << 2
-      return [png.data[idx], png.data[idx + 1], png.data[idx + 2]]
-    }
-    // Background: the app's existing --bg dark shade (see global.css).
-    expect(pixelAt(0, 0)).toEqual([0x1a, 0x1a, 0x1d])
-    // Center: the app's existing --accent purple (see settings-types.ts DEFAULT_SETTINGS).
-    expect(pixelAt(128, 128)).toEqual([0x6c, 0x4c, 0xf1])
+    const alphaAt = (x, y) => png.data[(png.width * y + x) << 2 | 3]
+    // The corners are outside the "contain"-fitted mark, so they stay fully
+    // transparent padding.
+    expect(alphaAt(2, 2)).toBe(0)
+    expect(alphaAt(253, 253)).toBe(0)
+    // The center falls inside the mark itself, which must not be transparent —
+    // this is the check that would fail if the crop rectangle ever missed the
+    // logo (e.g. the source image changed) and produced an empty icon.
+    expect(alphaAt(128, 128)).toBeGreaterThan(0)
   })
 })

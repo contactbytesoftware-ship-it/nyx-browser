@@ -1,3 +1,20 @@
+/* The auth screens (setup/unlock/recovery/loading/error) render before
+   BrowserChrome exists, so none of browser.css's `.tab-strip` drag region is on
+   screen yet. With `titleBarStyle: 'hidden'` the OS provides no title bar of its
+   own, so without a region like this the window is simply stuck wherever it
+   opened — nothing here was ever draggable. Windows' native caption-button
+   overlay (see titleBarOverlay.ts) paints on top of this strip's right edge
+   regardless of what's underneath, so no padding-right is needed the way
+   .tab-strip needs one for its own button elements. */
+.auth-drag-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  -webkit-app-region: drag;
+}
+
 .auth-screen {
   display: flex;
   flex-direction: column;

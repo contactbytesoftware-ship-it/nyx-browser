@@ -43,15 +43,28 @@ export default function AuthGate({ onUnlocked }: AuthGateProps): JSX.Element {
     // and re-running this would re-query the vault on every render.
   }, [])
 
-  if (mode === 'loading') return <div className="auth-screen">Loading…</div>
-  if (mode === 'error') {
-    return (
+  let content: JSX.Element
+  if (mode === 'loading') {
+    content = <div className="auth-screen">Loading…</div>
+  } else if (mode === 'error') {
+    content = (
       <div className="auth-screen">
         <h1>NYX Browser</h1>
         <p className="auth-error">{GENERIC_ERROR}</p>
       </div>
     )
+  } else if (mode === 'setup') {
+    content = <SetupScreen onComplete={() => setMode('unlock')} />
+  } else {
+    content = <UnlockScreen onUnlocked={onUnlocked} />
   }
-  if (mode === 'setup') return <SetupScreen onComplete={() => setMode('unlock')} />
-  return <UnlockScreen onUnlocked={onUnlocked} />
+
+  return (
+    <>
+      {/* The one drag region for every auth-mode screen (including RecoveryScreen,
+          which UnlockScreen renders in place of its own markup) — see auth.css. */}
+      <div className="auth-drag-strip" />
+      {content}
+    </>
+  )
 }
