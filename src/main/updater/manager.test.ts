@@ -23,24 +23,29 @@ vi.mock('electron', () => ({
   BrowserWindow: class {}
 }))
 
+// The real package exposes `autoUpdater` only via its default (CJS `exports`)
+// export — see the comment in manager.ts — so the mock must match that shape,
+// not provide `autoUpdater` as a named export of the mock module itself.
 vi.mock('electron-updater', () => ({
-  autoUpdater: {
-    on: (event: string, listener: Listener): void => {
-      mocks.listeners.set(event, listener)
-    },
-    checkForUpdates: mocks.checkForUpdates,
-    quitAndInstall: mocks.quitAndInstall,
-    get autoDownload() {
-      return mocks.autoDownloadValue
-    },
-    set autoDownload(value: boolean | undefined) {
-      mocks.autoDownloadValue = value
-    },
-    get disableWebInstaller() {
-      return mocks.disableWebInstallerValue
-    },
-    set disableWebInstaller(value: boolean | undefined) {
-      mocks.disableWebInstallerValue = value
+  default: {
+    autoUpdater: {
+      on: (event: string, listener: Listener): void => {
+        mocks.listeners.set(event, listener)
+      },
+      checkForUpdates: mocks.checkForUpdates,
+      quitAndInstall: mocks.quitAndInstall,
+      get autoDownload() {
+        return mocks.autoDownloadValue
+      },
+      set autoDownload(value: boolean | undefined) {
+        mocks.autoDownloadValue = value
+      },
+      get disableWebInstaller() {
+        return mocks.disableWebInstallerValue
+      },
+      set disableWebInstaller(value: boolean | undefined) {
+        mocks.disableWebInstallerValue = value
+      }
     }
   }
 }))

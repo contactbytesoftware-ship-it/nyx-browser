@@ -1,5 +1,16 @@
 import { ipcMain, type BrowserWindow } from 'electron'
-import { autoUpdater } from 'electron-updater'
+import electronUpdater from 'electron-updater'
+
+// electron-updater exposes `autoUpdater` as a getter defined via
+// `Object.defineProperty`, which Node's ESM loader does not statically detect as a
+// named export (this app's main process runs as real ESM, per package.json's
+// `"type": "module"`) — `import { autoUpdater } from 'electron-updater'` throws
+// "Named export 'autoUpdater' not found" at runtime in the packaged app, even
+// though it type-checks and passes every test (which mock the module entirely, so
+// they never exercise the real package's export shape). The default import is the
+// module's whole CJS `exports` object, which Node always provides regardless of
+// how the loader analyzes named exports.
+const { autoUpdater } = electronUpdater
 
 /**
  * The version of an already-downloaded, install-on-restart update, or null if
